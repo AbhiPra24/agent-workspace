@@ -39,6 +39,18 @@ venv.bak/
 *.db
 *.sqlite3
 jobs_cache.db
+jobs_cache.db-journal
+jobs_cache.db-wal
+jobs_cache.db-shm
+
+# Candidate Resumes & Confidential Documents
+resume/
+resume/*
+scripts/resume/
+scripts/resume/*
+*.pdf
+*.docx
+*.doc
 
 # IDE & Editor files
 .vscode/
