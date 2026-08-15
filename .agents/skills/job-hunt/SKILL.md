@@ -1,72 +1,29 @@
 ---
 name: job-hunt
 description: >-
-  Extracts and evaluates Senior Software QA Automation Engineer job listings
-  (Gurugram, Noida, Remote) against a candidate's resume using Firecrawl MCP
-  and Antigravity intelligence. Prioritizes Python + Playwright and independent
-  project QA leadership over direct people management. Trigger when the user
-  runs `/jobhunt`, provides a resume to match with jobs, or asks for QA roles.
+  Extracts Senior Software QA Automation Engineer roles (Gurugram/Noida/Remote)
+  using a Hybrid Scrape & Cache layer (SQLite + Cheap BS4 + Targeted Firecrawl MCP),
+  evaluates resume match via LLM (prioritizing Python + Playwright and Independent
+  QA Project Leadership), and presents a ranked terminal table.
+  Trigger with `/jobhunt [path_to_resume]`.
 ---
 
-# Job Hunt & QA Role Matcher Skill (Antigravity Native)
+# Job Hunt Automation Skill (Hybrid Scrape & Cache)
 
-This skill enables Antigravity (`agy`) to autonomously discover, extract, and rank Senior QA Automation Engineer positions using the built-in **Firecrawl MCP** server, matching them against a candidate's resume.
+Wraps the upgraded `job_matcher.py` engine to evaluate Senior QA Automation Engineer positions while aggressively protecting your monthly Firecrawl credit budget.
 
-## Target Profile & Evaluation Criteria
+## Hybrid Scrape & Cache Features
+1. **SQLite Database Caching (`jobs_cache.db`)**: Scraped listings and evaluation scores are cached locally to prevent duplicate network calls.
+2. **Cheap First Scraping (BeautifulSoup)**: Scrapes standard career pages locally using `requests` + `BeautifulSoup` to avoid burning credits on initial crawls.
+3. **Targeted Firecrawl Execution**: Restricts Firecrawl `/scrape` calls strictly to individual, verified job description URLs (no wildcards or root crawls).
+4. **Credit Budget Guardrail (`.firecrawl_tracker.json`)**: Automatically tracks monthly credit usage and warns when approaching limits (>= 800 / 1000).
 
-- **Target Roles**: Senior Software QA Automation Engineer, SDET Lead, QA Architect.
-- **Locations**: Gurugram, Noida, or Remote (India).
-- **Core Stack (45% Weight)**: Python, Playwright, PyTest, E2E UI & API Automation, CI/CD pipelines.
-- **Leadership Profile (35% Weight)**: 
-  - **High Score**: Independent Project QA Leadership, test framework architecture from scratch, test strategy, developer enablement, code quality gates.
-  - **Penalize**: Non-technical direct people management roles (HR appraisals, administrative line management, resource scheduling).
-- **Domain & Quality Depth (20% Weight)**: Distributed systems testing, Docker, GitHub Actions, performance testing.
+## Usage
 
----
+When triggered via `/jobhunt [path_to_resume]` or when asked to find and score Senior QA automation jobs:
 
-## Direct Antigravity Workflow
-
-When the user runs `/jobhunt [path_to_resume]` or asks for job matching:
-
-### Step 1: Read Candidate Resume
-Use `view_file` to read and parse the candidate's resume (PDF, TXT, or Markdown):
-```
-Resume path: [provided by user, e.g., scripts/sample_resume.txt]
-```
-
-### Step 2: Search Job Listings via Firecrawl MCP
-Call the `firecrawl_search` MCP tool:
-- **ServerName**: `firecrawl`
-- **ToolName**: `firecrawl_search`
-- **Arguments**:
-  ```json
-  {
-    "query": "\"Senior Software QA Automation Engineer\" (Gurugram OR Noida OR Remote) \"Python\" \"Playwright\"",
-    "limit": 8,
-    "scrapeOptions": {
-      "formats": ["markdown"]
-    }
-  }
-  ```
-
-### Step 3: Evaluate Each Listing
-Evaluate each discovered job listing against the candidate's resume using the evaluation criteria above. Assign a match score from **0 to 100%**.
-
-### Step 4: Present Ranked Match Table
-Render a formatted markdown table in the chat:
-
-| Rank | Match Score | Job Title | Company | Leadership Fit | Job URL |
-| :--- | :---: | :--- | :--- | :--- | :--- |
-| 1 | **95%** 🌟 | Senior QA Automation Engineer | TechScale | Independent QA Lead | [Apply](https://...) |
-| 2 | **88%** 🌟 | Lead SDET (Python + Playwright) | FinTech Labs | Technical Project Lead | [Apply](https://...) |
-| 3 | **15%** ⛔ | QA People Manager | Enterprise Corp | People Manager (Penalized) | [Apply](https://...) |
-
-Provide a 2-3 bullet breakdown for top matches explaining key stack strengths and alignment.
-
----
-
-## Alternative CLI Execution
-For standalone command-line usage without interactive chat:
-```bash
-python3 scripts/job_matcher.py --resume <path_to_resume>
-```
+1. Identify the input resume file path (`.pdf` or `.txt`).
+2. Run the evaluation script:
+   ```bash
+   python3 scripts/job_matcher.py --resume <path_to_resume>
+   ```

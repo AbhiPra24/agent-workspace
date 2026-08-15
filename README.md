@@ -1,31 +1,42 @@
-# AI Agent Workspace
+# AI Agent Workspace & Hybrid Job Matcher
 
 A comprehensive workspace for AI agents, Model Context Protocol (MCP) servers, CLI tools, and Antigravity custom skills.
+
+## Features & Optimizations
+
+- **Hybrid Scrape & Cache Layer**:
+  - **SQLite Database Caching (`jobs_cache.db`)**: Automatically caches raw text and evaluated match scores so repeated runs don't consume network bandwidth or LLM tokens.
+  - **Cheap First Scraping (BeautifulSoup)**: Scrapes standard career pages and links locally using `requests` + `BeautifulSoup` to avoid burning Firecrawl credits on basic pages.
+  - **Targeted Firecrawl Execution**: Restricts Firecrawl API calls strictly to single, validated job description URLs (no wildcards or root domain crawling).
+  - **Credit Budget Guardrail (`.firecrawl_tracker.json`)**: Tracks monthly usage and prompts for confirmation if usage approaches 800 / 1,000 credits.
+
+---
 
 ## Directory Structure
 
 ```text
 agent-workspace/
-├── .git/                 # Git repository
-├── .gitignore            # Git exclusion rules
-├── .env                  # Local secrets and environment variables
-├── .env.example          # Environment template
-├── requirements.txt      # Python dependencies
-├── README.md             # Documentation
+├── .git/                                # Git repository
+├── .gitignore                           # Python, venv, and SQLite cache ignore rules
+├── .env / .env.example                  # Environment configuration template
+├── .firecrawl_tracker.json              # Monthly credit usage tracker
+├── jobs_cache.db                        # SQLite database for scraped content & scores
+├── requirements.txt                     # Python dependencies
+├── README.md                            # Workspace documentation
 │
-├── mcp-servers/          # MCP server configurations
+├── mcp-servers/                         # MCP server configurations
 │   └── firecrawl-config.json
 │
-├── skills/               # Antigravity CLI skills
+├── skills/                              # Antigravity CLI skills
 │   ├── job_hunt.skill
 │   └── job-hunt/
 │       └── SKILL.md
 │
-├── agents/               # Custom agent configurations & definitions
+├── agents/                              # Custom agent configurations & definitions
 │
-└── scripts/              # Executable automations
-    ├── job_matcher.py    # Firecrawl QA job search & LLM matching engine
-    └── sample_resume.txt # Sample QA Lead resume for testing
+└── scripts/                             # Executable automations
+    ├── job_matcher.py                   # Hybrid scrape, SQLite cache & LLM matcher
+    └── sample_resume.txt                # Sample QA Lead resume for testing
 ```
 
 ---
@@ -52,9 +63,6 @@ LLM_MODEL=llama3.2
 ```bash
 # Test with the bundled sample resume
 python3 scripts/job_matcher.py --resume scripts/sample_resume.txt
-
-# Test with your own PDF or TXT resume
-python3 scripts/job_matcher.py --resume /path/to/my_resume.pdf
 ```
 
 ### 4. Trigger via Antigravity Skill
