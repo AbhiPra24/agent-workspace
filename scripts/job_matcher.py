@@ -152,7 +152,7 @@ def save_cached_job(job_data: Dict[str, Any], db_path: Path = DB_PATH):
             updated_at=CURRENT_TIMESTAMP
     """, (
         job_data.get("url"),
-        job_data.get("title", ""),
+        job_data.get("title") or job_data.get("job_title", ""),
         job_data.get("company", ""),
         job_data.get("location", ""),
         job_data.get("scraped_content") or job_data.get("description", ""),
@@ -754,8 +754,8 @@ def render_results_table(evaluations: List[Dict[str, Any]]):
             table.add_row(
                 str(idx),
                 score_str,
-                item.get("job_title", "N/A"),
-                item.get("company", "N/A"),
+                item.get("job_title") or item.get("title") or "QA Engineer",
+                item.get("company") or "Company",
                 item.get("leadership_type", "N/A"),
                 source_badge,
                 item.get("url", "N/A")
