@@ -1,0 +1,29 @@
+---
+name: job-hunt
+description: >-
+  Extracts Senior Software QA Automation Engineer roles (Gurugram/Noida/Remote)
+  using Firecrawl, evaluates resume match via LLM (prioritizing Python + Playwright
+  and Independent QA Project Leadership), and presents a ranked terminal table.
+  Trigger with `/jobhunt [path_to_resume]`.
+---
+
+# Job Hunt Automation Skill
+
+Wraps the `job_matcher.py` engine to parse a candidate's resume, discover matching Senior QA Automation roles across Gurugram, Noida, and Remote locations via Firecrawl, and evaluate the candidate fit using local LLM reasoning.
+
+## How to Run
+
+When the user runs `/jobhunt [path_to_resume]` or asks to search and evaluate QA jobs:
+
+1. Locate the candidate resume path provided by the user (or default to `scripts/sample_resume.txt`).
+2. Run the matcher script from the workspace root:
+   ```bash
+   python3 scripts/job_matcher.py --resume <path_to_resume>
+   ```
+
+## Workflow Execution Rules
+- **Role Target**: Senior Software QA Automation Engineer / SDET Lead
+- **Location Target**: Gurugram, Noida, Remote
+- **Stack Priority**: Python + Playwright (PyTest, CI/CD, Framework Architecture)
+- **Leadership Profile**: Independent Project QA Ownership (filters against non-technical People Management)
+- **Output**: Ranked Table with Match Scores (0-100%), Companies, and Direct Links.

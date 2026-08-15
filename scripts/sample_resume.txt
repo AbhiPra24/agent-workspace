@@ -1,0 +1,26 @@
+John Doe
+Senior Software QA Automation Engineer / Test Architect
+Location: Gurugram, India | Email: john.doe.qa@example.com | GitHub: github.com/johndoe-qa
+
+SUMMARY:
+Results-driven Senior QA Automation Engineer with 6+ years of experience designing robust test automation frameworks from scratch using Python and Playwright. Proven track record of leading end-to-end quality initiatives for high-scale distributed systems, orchestrating CI/CD test gates in GitHub Actions, and driving automated API & UI testing. Passionate about independent technical project leadership and architecture rather than direct people management.
+
+CORE SKILLS:
+- Languages & Frameworks: Python, Playwright, PyTest, Selenium, Requests, FastAPI
+- Architecture & CI/CD: Test Framework Design, GitHub Actions, Docker, Jenkins, Kubernetes
+- Testing Domains: E2E Automation, API Contract Testing, Performance/Load Testing (Locust), Security Checks
+- Leadership: Project QA Ownership, Technical Mentorship, Quality Governance, Agile QA Planning
+
+PROFESSIONAL EXPERIENCE:
+Senior QA Automation Lead | TechInnovate Systems (Gurugram) | 2022 - Present
+- Architected a distributed Playwright + Python test automation suite reducing regression cycle time from 4 days to 45 minutes.
+- Integrated automated smoke and sanity suites into GitHub Actions CI/CD pipelines across 14 microservices.
+- Led the quality strategy for multi-tenant SaaS products, establishing code quality gates, code reviews for test suites, and test coverage metrics (>90%).
+- Acted as primary technical quality owner across 3 scrum teams without direct line management responsibilities.
+
+SDET II | CloudScale Analytics (Noida) | 2019 - 2022
+- Developed Python-based API test automation using PyTest and Requests.
+- Migrated legacy Selenium suites to Playwright for modern frontend apps, achieving 3x execution speedup and zero flakiness.
+
+EDUCATION:
+B.Tech in Computer Science & Engineering
