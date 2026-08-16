@@ -1,0 +1,13 @@
+# GitHub Copilot Custom Instructions
+
+## Project Overview
+This repository is an AI Agent Workspace containing modular skills, MCP server presets, and automated cross-platform sync utilities.
+
+## Coding Standards & Conventions
+- Python 3.9+ with modern type hinting (`typing` module / standard types).
+- Use `pydantic` for data schemas and validation.
+- Format terminal output with `rich` console and fallback gracefully.
+- Keep dependencies minimal and documented in `requirements.txt`.
+
+## Available Skills & Tools
+${SKILLS_SUMMARY}

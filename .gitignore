@@ -1,12 +1,8 @@
-# Byte-compiled / optimized / DLL files
+# Python & Byte-compiled files
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -27,21 +23,27 @@ share/python-wheels/
 MANIFEST
 
 # Virtual Environments
-.env
-.venv
-env/
+.venv/
 venv/
 ENV/
+env/
 env.bak/
 venv.bak/
+
+# Environment variables & Local configuration
+.env
+.env.local
+.env.*.local
+*.bak
+*.backup
 
 # Local databases & trackers
 *.db
 *.sqlite3
-jobs_cache.db
-jobs_cache.db-journal
-jobs_cache.db-wal
-jobs_cache.db-shm
+*.db-journal
+*.db-wal
+*.db-shm
+.firecrawl_tracker.json
 
 # Candidate Resumes & Confidential Documents
 resume/
@@ -54,6 +56,7 @@ scripts/resume/*
 
 # IDE & Editor files
 .vscode/
+!.vscode/settings.example.json
 .idea/
 *.swp
 *.swo
@@ -67,3 +70,8 @@ scripts/resume/*
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Test & Coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/

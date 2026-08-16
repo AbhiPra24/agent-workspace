@@ -1,0 +1,9 @@
+---
+description: ${SKILL_DESCRIPTION}
+globs: ${SKILL_GLOBS}
+alwaysApply: false
+---
+
+# ${SKILL_NAME}
+
+${SKILL_CONTENT}

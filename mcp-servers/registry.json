@@ -1,0 +1,111 @@
+{
+  "version": "1.0.0",
+  "description": "Standardized MCP (Model Context Protocol) Server Registry",
+  "servers": {
+    "firecrawl": {
+      "name": "Firecrawl",
+      "category": "web",
+      "description": "Advanced web crawling, targeted scraping, and LLM-ready markdown extraction with JS rendering.",
+      "command": "npx",
+      "args": ["-y", "@mendable/firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      },
+      "homepage": "https://firecrawl.dev"
+    },
+    "filesystem": {
+      "name": "Filesystem",
+      "category": "system",
+      "description": "Secure local file system access allowing AI agents to read, write, and search files in allowed directories.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${WORKSPACE_DIR:-.}"],
+      "env": {},
+      "homepage": "https://github.com/modelcontextprotocol/servers"
+    },
+    "fetch": {
+      "name": "Fetch",
+      "category": "web",
+      "description": "Fast web fetching and HTML-to-Markdown conversion for documentation and public web pages.",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": {},
+      "homepage": "https://github.com/modelcontextprotocol/servers"
+    },
+    "git": {
+      "name": "Git",
+      "category": "development",
+      "description": "Direct Git repository operations, commit history, branch management, and diff generation.",
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "${WORKSPACE_DIR:-.}"],
+      "env": {},
+      "homepage": "https://github.com/modelcontextprotocol/servers"
+    },
+    "github": {
+      "name": "GitHub",
+      "category": "development",
+      "description": "GitHub integration for repository search, issue tracking, PR reviews, and file updates.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "homepage": "https://github.com/modelcontextprotocol/servers"
+    },
+    "sqlite": {
+      "name": "SQLite",
+      "category": "database",
+      "description": "Query and inspect SQLite databases, tables, schemas, and execute analytical queries.",
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "${SQLITE_DB_PATH:-./workspace.db}"],
+      "env": {},
+      "homepage": "https://github.com/modelcontextprotocol/servers"
+    },
+    "brave-search": {
+      "name": "Brave Search",
+      "category": "web",
+      "description": "Privacy-first web and local search using the Brave Search API.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "homepage": "https://brave.com/search/api/"
+    },
+    "puppeteer": {
+      "name": "Puppeteer",
+      "category": "automation",
+      "description": "Headless browser automation for interactive web testing, screenshots, and dynamic single-page applications.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+      "env": {},
+      "homepage": "https://github.com/modelcontextprotocol/servers"
+    },
+    "postgres": {
+      "name": "PostgreSQL",
+      "category": "database",
+      "description": "Read-only and analytical access to PostgreSQL databases and Supabase instances.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}"],
+      "env": {},
+      "homepage": "https://github.com/modelcontextprotocol/servers"
+    },
+    "memory": {
+      "name": "Memory",
+      "category": "knowledge",
+      "description": "Knowledge-graph based persistent memory across conversations and sessions.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {},
+      "homepage": "https://github.com/modelcontextprotocol/servers"
+    },
+    "sequential-thinking": {
+      "name": "Sequential Thinking",
+      "category": "reasoning",
+      "description": "Dynamic reasoning engine enabling agents to reflect, revise, and branch multi-step problem solving.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "env": {},
+      "homepage": "https://github.com/modelcontextprotocol/servers"
+    }
+  }
+}

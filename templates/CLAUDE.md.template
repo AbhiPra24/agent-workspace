@@ -1,0 +1,16 @@
+# Claude Workspace Guidelines & Active Skills
+
+Welcome to the AI Agent Workspace. Below are the project guidelines and registered agent skills for this repository.
+
+## Commands & Workflows
+- Setup virtual environment: `make setup`
+- Health check & diagnostics: `make doctor`
+- List skills & MCP servers: `make list`
+- Run test validation suite: `make test`
+
+## Active Skills & Capabilities
+${SKILLS_SUMMARY}
+
+## Guidelines & Architecture
+- Maintain code modularity, strict typing, and comprehensive docstrings.
+- Follow test-driven development and ensure automated tests pass before committing.

@@ -819,6 +819,18 @@ def main():
         default=os.getenv("LLM_MODEL", "llama3.2"),
         help="LLM model identifier"
     )
+    parser.add_argument(
+        "--query",
+        "-q",
+        type=str,
+        default="Senior QA Automation Engineer",
+        help="Target job role query"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse resume and display target jobs without calling external APIs"
+    )
 
     args = parser.parse_args()
 
@@ -835,6 +847,15 @@ def main():
     # 2. Get Seed Candidate Roles
     seed_jobs = get_mock_seed_jobs()
     
+    if args.dry_run:
+        log_info(f"[DRY-RUN] Candidate Resume: {args.resume}")
+        log_info(f"[DRY-RUN] Target Query: {args.query} | Location: {args.location}")
+        log_info(f"[DRY-RUN] Found {len(seed_jobs)} candidate listings ready for evaluation.")
+        for idx, sj in enumerate(seed_jobs, 1):
+            print(f"  {idx}. {sj.get('title')} @ {sj.get('company')} ({sj.get('url')})")
+        log_success("Dry run completed successfully.")
+        return
+
     # 3. Hybrid Scrape & Cache Execution
     log_info("Executing Hybrid Fetch: Checking SQLite Cache -> Cheap BS4 Scrape -> Targeted Firecrawl...")
     prepared_jobs = fetch_and_prepare_jobs(seed_jobs)

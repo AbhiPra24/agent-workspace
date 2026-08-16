@@ -1,0 +1,11 @@
+# Windsurf Cascade Rules & Agent Skills
+
+## Project Context
+Universal AI Agent Workspace managing custom skills, MCP servers, and multi-model integrations.
+
+## Available Agent Skills
+${SKILLS_SUMMARY}
+
+## Engineering Guidelines
+- Follow standard Python / TypeScript best practices.
+- Ensure all MCP JSON configs follow the Model Context Protocol specification.
