@@ -118,6 +118,17 @@ make install-mcp TARGET=copilot SERVERS=filesystem,git,fetch
 
 ## 📦 Bundled Skills Catalog
 
+### 🐙 GitHub Automation Suite
+| Skill Name | Description | Trigger |
+| :--- | :--- | :--- |
+| **`github-pr-create`** | Analyzes git diff & commit history, generates semantic PR titles, descriptions, and creates PR via GitHub CLI/MCP | `/pr-create [title_or_target_branch]` |
+| **`github-pr-review`** | Performs multi-dimensional code review on PR diffs (security, logic, perf, architecture) and submits reviews | `/pr-review [pr_number_or_url]` |
+| **`github-pr-rebase`** | Rebases PRs onto target branch, guides conflict resolution, and safely pushes with `--force-with-lease` | `/pr-rebase [base_branch]` |
+| **`github-release-drafter`** | Extracts merged PRs & commits since latest tag, generates SemVer release notes & changelogs | `/release-draft [version_tag]` |
+| **`github-issue-triage`** | Analyzes incoming issues, checks for duplicates, assigns labels/milestones, and drafts reproduction replies | `/issue-triage [issue_number]` |
+| **`github-ci-debugger`** | Downloads & analyzes failed GitHub Actions workflow logs, isolates stack traces, and suggests code patches | `/ci-debug [run_id_or_branch]` |
+
+### 🛠️ Core Agent & Engineering Skills
 | Skill Name | Description | Trigger |
 | :--- | :--- | :--- |
 | **`job-matcher`** | Hybrid Scrape & Cache job matcher (SQLite + BS4 + Firecrawl fallback + LLM scoring) | `/jobmatch [resume]` |

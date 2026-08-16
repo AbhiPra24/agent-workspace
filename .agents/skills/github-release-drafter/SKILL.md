@@ -1,0 +1,58 @@
+---
+name: github-release-drafter
+description: >-
+  Extracts merged PRs, commits, and breaking changes since the latest git tag,
+  generates semver release notes, and publishes GitHub releases with changelogs.
+  Trigger with `/release-draft [version_tag]`.
+parameters:
+  tag:
+    type: string
+    description: Semantic version tag for the release (e.g. v1.2.0)
+    required: false
+  draft:
+    type: boolean
+    description: Whether to save as an unpublished draft release
+    default: true
+---
+
+# GitHub Release Drafter Skill
+
+Automates semantic versioning release notes, changelog extraction, and GitHub Release publication.
+
+## Workflow
+
+### 1. Identify Release Scope & Commits
+- Locate latest git tag:
+  ```bash
+  git describe --tags --abbrev=0 2>/dev/null || echo "No previous tags"
+  ```
+- Collect all commits and merged PRs since previous tag:
+  ```bash
+  git log $(git describe --tags --abbrev=0 2>/dev/null)..HEAD --pretty=format:"* %s (%h)" --no-merges
+  ```
+- List merged pull requests via `gh` CLI:
+  ```bash
+  gh pr list --state merged --limit 30 --json number,title,author,labels,mergedAt
+  ```
+
+### 2. Categorize Changes & Determine SemVer
+Parse commit messages and PR titles into standard changelog sections:
+- 🚀 **Features**: New functionality (`feat: ...`)
+- 🐛 **Bug Fixes**: Fixes and patches (`fix: ...`)
+- ⚡ **Performance & Refactoring**: Optimizations (`perf: ...`, `refactor: ...`)
+- 💥 **Breaking Changes**: Non-backwards-compatible modifications (`BREAKING CHANGE: ...` or `feat!: ...`)
+- 📝 **Documentation & Chores**: Internal improvements (`docs: ...`, `chore: ...`)
+
+**Version Bump Heuristic**:
+- Breaking changes $\to$ **Major** bump (`vX.0.0`)
+- Features $\to$ **Minor** bump (`v0.X.0`)
+- Bug fixes only $\to$ **Patch** bump (`v0.0.X`)
+
+### 3. Generate Release Notes & Publish
+Draft markdown release notes and publish via `gh`:
+```bash
+gh release create <tag> \
+  --title "<tag> - <Release Title>" \
+  --notes "<markdown_changelog>" \
+  --draft
+```

@@ -1,0 +1,65 @@
+---
+description: Analyzes git diff and commit history, drafts semantic PR title and description with test verification and breaking change notices, and creates the pull request via GitHub CLI or MCP. Trigger with `/pr-create [title_or_target_branch]`.
+globs: *
+alwaysApply: false
+---
+
+# Github Pr Create
+
+# GitHub PR Creator Skill
+
+Automates end-to-end Pull Request generation following professional open-source and enterprise standards.
+
+## Workflow
+
+### 1. Git State Inspection
+- Check current branch: `git branch --show-current`
+- Verify working tree is clean and local commits are up-to-date:
+  ```bash
+  git status
+  git log origin/main..HEAD --oneline
+  ```
+- Generate complete diff against base branch:
+  ```bash
+  git diff origin/main...HEAD
+  ```
+
+### 2. Title & Description Generation
+Generate a semantic title adhering to **Conventional Commits**:
+- `feat(scope): ...` for new features
+- `fix(scope): ...` for bug fixes
+- `refactor(scope): ...` for structural changes without behavior alterations
+- `docs(scope): ...`, `test(scope): ...`, `chore(scope): ...`
+
+Generate a structured description using the following template:
+
+```markdown
+## Summary
+Concise 2-3 sentence overview of what this PR does and why.
+
+## Proposed Changes
+- **Component / Module**: Bullet points detailing specific additions, deletions, or modifications.
+- **Architectural Notes**: Any design decisions or patterns introduced.
+
+## Breaking Changes
+- [ ] None / Details of breaking changes if any.
+
+## Verification & Testing
+- [x] Unit tests passed (`make test` / `pytest`)
+- [x] Manual verification performed (include steps or logs)
+
+## Related Issues
+Closes #<issue_number> (if applicable)
+```
+
+### 3. Execution & PR Creation
+1. Push branch to remote:
+   ```bash
+   git push -u origin <current_branch>
+   ```
+2. Create PR using `gh` CLI:
+   ```bash
+   gh pr create --base main --title "<title>" --body "<body>"
+   ```
+   *(Or with `--draft` if requested)*
+3. Return the created PR URL and review summary to the user.

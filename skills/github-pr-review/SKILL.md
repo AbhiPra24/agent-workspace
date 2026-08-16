@@ -1,0 +1,63 @@
+---
+name: github-pr-review
+description: >-
+  Fetches Pull Request diffs, reviews changes for security, performance, correctness,
+  and architecture, and submits structured PR reviews (Approve, Comment, Request Changes)
+  via GitHub CLI or MCP.
+  Trigger with `/pr-review [pr_number_or_url]`.
+parameters:
+  pr:
+    type: string
+    description: Pull request number, branch name, or GitHub PR URL
+    required: true
+  action:
+    type: string
+    description: Review verdict (comment | approve | request-changes)
+    default: comment
+---
+
+# GitHub PR Reviewer Skill
+
+Performs deep, senior-level code reviews on GitHub Pull Requests.
+
+## Workflow
+
+### 1. Fetch PR Details & Diff
+- Retrieve PR metadata and checks:
+  ```bash
+  gh pr view <pr_number> --json title,body,author,baseRefName,headRefName,statusCheckRollup
+  ```
+- Fetch full diff:
+  ```bash
+  gh pr diff <pr_number>
+  ```
+- Inspect CI status: Check for failed jobs or test timeouts.
+
+### 2. Multi-Dimensional Review Rubric
+
+Review the diff across 5 critical dimensions:
+1. **Logic & Correctness**: Edge cases (empty strings, null values, division by zero, network timeouts), concurrency safety, off-by-one errors.
+2. **Security & Vulnerabilities**: Injection attacks (SQL/NoSQL/Command/XSS), unsanitized user input, secrets/tokens committed, improper authorization checks.
+3. **Performance & Scalability**: N+1 queries, memory leaks, algorithmic complexity ($O(N^2)$ vs $O(N)$), unindexed lookups.
+4. **Test Coverage & Reliability**: Are unit/integration tests included for new paths? Are tests deterministic (no flaky time/sleep dependencies)?
+5. **Architectural Consistency & Clean Code**: Separation of concerns, backwards compatibility, typing annotations, maintainability.
+
+### 3. Review Formulation & Submission
+
+Draft structured markdown comments:
+- Categorize feedback into:
+  - 🚨 **Blockers (Must-Fix)**: Security vulnerabilities, logic bugs, test regressions.
+  - 💡 **Suggestions (Non-Blocking)**: Refactoring opportunities, documentation improvements.
+  - 👏 **Positive Feedback**: Highlighting great design patterns or clean abstractions.
+
+Submit review via `gh` CLI:
+```bash
+# Submit as general comment
+gh pr review <pr_number> --comment --body "<review_markdown>"
+
+# Approve PR
+gh pr review <pr_number> --approve --body "<review_markdown>"
+
+# Request changes
+gh pr review <pr_number> --request-changes --body "<review_markdown>"
+```
