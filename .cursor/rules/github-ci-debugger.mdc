@@ -1,5 +1,5 @@
 ---
-description: Inspects GitHub Actions workflow runs, downloads and parses failed job logs, extracts root cause stack traces, and suggests targeted code patches. Trigger with `/ci-debug [run_id_or_branch]`.
+description: Inspects GitHub Actions workflow runs, downloads and parses failed job logs, extracts root cause stack traces, and suggests targeted code patches using token-efficient gh CLI bash commands. Trigger with `/ci-debug [run_id_or_branch]`.
 globs: *
 alwaysApply: false
 ---
@@ -8,35 +8,36 @@ alwaysApply: false
 
 # GitHub CI Debugger Skill
 
-Automates diagnosis and resolution of failed GitHub Actions continuous integration (CI) workflows.
+Diagnoses failed GitHub Actions CI runs with minimal token consumption by targeting only failed step logs.
+
+> [!TIP]
+> **Token Optimization**: Never dump full multi-megabyte CI runner logs. Always use `gh run view --log-failed` and pipe through `grep` or `tail` to isolate exact error stack traces.
 
 ## Workflow
 
-### 1. Identify Failed Runs & Jobs
-- List recent workflow runs:
-  ```bash
-  gh run list --limit 10 --json databaseId,name,status,conclusion,headBranch,url
-  ```
-- Identify the failed run ID and view run details:
-  ```bash
-  gh run view <run_id>
-  ```
+### 1. Identify Failed Workflow Run
+```bash
+# List latest 5 workflow runs in compact tabular format
+gh run list --limit 5 --json databaseId,name,status,conclusion,headBranch --jq '.[] | "ID: \(.databaseId) | \(.name) | \(.conclusion) (\(.headBranch))"'
 
-### 2. Extract Failed Job Logs
-- Download failure log lines:
-  ```bash
-  gh run view <run_id> --log-failed
-  ```
-- Filter out noise (ANSI escape codes, runner setup/teardown steps) to isolate:
-  - Exact failing test assertion or error message.
-  - Full Python/TypeScript/Go stack trace.
-  - Environment differences (OS version, missing dependencies, locked files).
+# View specific run summary
+gh run view <run_id>
+```
 
-### 3. Root-Cause Analysis & Code Fix
-- Map stack trace lines to source repository files.
-- Formulate hypothesis for failure:
-  - Test assertion mismatch / updated schema.
-  - Missing environment variable or secret.
-  - Platform/OS-specific path separator or concurrency timing.
-  - Dependency version drift.
-- Apply code patch locally, run test suite to verify fix, and commit fix.
+### 2. Extract Only Failed Log Lines
+```bash
+# Download only failed step output (token-optimized)
+gh run view <run_id> --log-failed | tail -n 80
+
+# Or search for python/node errors directly
+gh run view <run_id> --log-failed | grep -E "(FAIL|Error|Exception|Traceback|AssertionError)" -C 5
+```
+
+### 3. Local Reproduction & Code Patch
+1. Isolate the failing test name or file from the stack trace.
+2. Run the exact test locally:
+   ```bash
+   pytest tests/test_failed_case.py -v -k "test_name"
+   ```
+3. Apply the targeted bug fix in the source code.
+4. Verify all tests pass locally (`make test`), then commit and push.

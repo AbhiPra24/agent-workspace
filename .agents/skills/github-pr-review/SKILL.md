@@ -3,7 +3,7 @@ name: github-pr-review
 description: >-
   Fetches Pull Request diffs, reviews changes for security, performance, correctness,
   and architecture, and submits structured PR reviews (Approve, Comment, Request Changes)
-  via GitHub CLI or MCP.
+  using token-efficient GitHub CLI (gh) bash commands.
   Trigger with `/pr-review [pr_number_or_url]`.
 parameters:
   pr:
@@ -18,46 +18,49 @@ parameters:
 
 # GitHub PR Reviewer Skill
 
-Performs deep, senior-level code reviews on GitHub Pull Requests.
+Performs deep, senior-level code reviews on GitHub Pull Requests using lightweight, token-efficient `gh` CLI commands.
+
+> [!TIP]
+> **Token Optimization**: Use targeted `gh` JSON filters (`--json`) and diff limiters rather than dumping raw full repository payloads. Never use heavy MCP tool round-trips for PR reviews.
 
 ## Workflow
 
-### 1. Fetch PR Details & Diff
-- Retrieve PR metadata and checks:
-  ```bash
-  gh pr view <pr_number> --json title,body,author,baseRefName,headRefName,statusCheckRollup
-  ```
-- Fetch full diff:
-  ```bash
-  gh pr diff <pr_number>
-  ```
-- Inspect CI status: Check for failed jobs or test timeouts.
+### 1. Fetch PR Metadata & Compact Diff
+```bash
+# Fetch essential metadata (token-optimized JSON fields)
+gh pr view <pr_number> --json number,title,author,baseRefName,headRefName,statusCheckRollup,additions,deletions,changedFiles
+
+# Fetch changed files summary first
+gh pr view <pr_number> --json files --jq '.files[] | "\(.path) (+\(.additions) -\(.deletions))"'
+
+# Fetch the exact code diff
+gh pr diff <pr_number>
+```
 
 ### 2. Multi-Dimensional Review Rubric
 
-Review the diff across 5 critical dimensions:
-1. **Logic & Correctness**: Edge cases (empty strings, null values, division by zero, network timeouts), concurrency safety, off-by-one errors.
-2. **Security & Vulnerabilities**: Injection attacks (SQL/NoSQL/Command/XSS), unsanitized user input, secrets/tokens committed, improper authorization checks.
-3. **Performance & Scalability**: N+1 queries, memory leaks, algorithmic complexity ($O(N^2)$ vs $O(N)$), unindexed lookups.
-4. **Test Coverage & Reliability**: Are unit/integration tests included for new paths? Are tests deterministic (no flaky time/sleep dependencies)?
-5. **Architectural Consistency & Clean Code**: Separation of concerns, backwards compatibility, typing annotations, maintainability.
+Inspect changes across 5 senior-level dimensions:
+1. **Correctness & Logic**: Null safety, boundary values, error propagation, off-by-one errors, concurrency hazards.
+2. **Security & Vulnerabilities**: SQL/Command/XSS injection, unvalidated user inputs, hardcoded secrets/credentials, improper access control.
+3. **Performance & Scalability**: Inefficient loops, unindexed DB queries, memory leaks, algorithmic complexity ($O(N)$ vs $O(N^2)$).
+4. **Test Coverage**: Presence of unit/integration tests for new code paths, test determinism.
+5. **Architectural Cleanliness**: Separation of concerns, backwards compatibility, typing annotations, maintainability.
 
-### 3. Review Formulation & Submission
+### 3. Submit Structured Review via `gh` CLI
 
-Draft structured markdown comments:
-- Categorize feedback into:
-  - 🚨 **Blockers (Must-Fix)**: Security vulnerabilities, logic bugs, test regressions.
-  - 💡 **Suggestions (Non-Blocking)**: Refactoring opportunities, documentation improvements.
-  - 👏 **Positive Feedback**: Highlighting great design patterns or clean abstractions.
+Format feedback into:
+- 🚨 **Blockers (Must-Fix)**: Security issues, critical logic defects.
+- 💡 **Suggestions (Non-Blocking)**: Refactors, performance optimizations.
+- 👏 **Positive Feedback**: Commending clean abstractions.
 
-Submit review via `gh` CLI:
+Execute the review submission:
 ```bash
-# Submit as general comment
-gh pr review <pr_number> --comment --body "<review_markdown>"
+# Submit general review comment:
+gh pr review <pr_number> --comment --body "<markdown_review>"
 
-# Approve PR
-gh pr review <pr_number> --approve --body "<review_markdown>"
+# Submit approval:
+gh pr review <pr_number> --approve --body "<markdown_review>"
 
-# Request changes
-gh pr review <pr_number> --request-changes --body "<review_markdown>"
+# Request changes:
+gh pr review <pr_number> --request-changes --body "<markdown_review>"
 ```

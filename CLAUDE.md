@@ -45,291 +45,317 @@ Rigorous, production-focused code inspection agent tailored for modern software 
 - **Line-by-line Comments**: Clickable markdown references with code diff blocks.
 
 ### github-ci-debugger
-**Description**: Inspects GitHub Actions workflow runs, downloads and parses failed job logs, extracts root cause stack traces, and suggests targeted code patches. Trigger with `/ci-debug [run_id_or_branch]`.
+**Description**: Inspects GitHub Actions workflow runs, downloads and parses failed job logs, extracts root cause stack traces, and suggests targeted code patches using token-efficient gh CLI bash commands. Trigger with `/ci-debug [run_id_or_branch]`.
 
 # GitHub CI Debugger Skill
 
-Automates diagnosis and resolution of failed GitHub Actions continuous integration (CI) workflows.
+Diagnoses failed GitHub Actions CI runs with minimal token consumption by targeting only failed step logs.
+
+> [!TIP]
+> **Token Optimization**: Never dump full multi-megabyte CI runner logs. Always use `gh run view --log-failed` and pipe through `grep` or `tail` to isolate exact error stack traces.
 
 ## Workflow
 
-### 1. Identify Failed Runs & Jobs
-- List recent workflow runs:
-  ```bash
-  gh run list --limit 10 --json databaseId,name,status,conclusion,headBranch,url
-  ```
-- Identify the failed run ID and view run details:
-  ```bash
-  gh run view <run_id>
-  ```
+### 1. Identify Failed Workflow Run
+```bash
+# List latest 5 workflow runs in compact tabular format
+gh run list --limit 5 --json databaseId,name,status,conclusion,headBranch --jq '.[] | "ID: \(.databaseId) | \(.name) | \(.conclusion) (\(.headBranch))"'
 
-### 2. Extract Failed Job Logs
-- Download failure log lines:
-  ```bash
-  gh run view <run_id> --log-failed
-  ```
-- Filter out noise (ANSI escape codes, runner setup/teardown steps) to isolate:
-  - Exact failing test assertion or error message.
-  - Full Python/TypeScript/Go stack trace.
-  - Environment differences (OS version, missing dependencies, locked files).
+# View specific run summary
+gh run view <run_id>
+```
 
-### 3. Root-Cause Analysis & Code Fix
-- Map stack trace lines to source repository files.
-- Formulate hypothesis for failure:
-  - Test assertion mismatch / updated schema.
-  - Missing environment variable or secret.
-  - Platform/OS-specific path separator or concurrency timing.
-  - Dependency version drift.
-- Apply code patch locally, run test suite to verify fix, and commit fix.
+### 2. Extract Only Failed Log Lines
+```bash
+# Download only failed step output (token-optimized)
+gh run view <run_id> --log-failed | tail -n 80
+
+# Or search for python/node errors directly
+gh run view <run_id> --log-failed | grep -E "(FAIL|Error|Exception|Traceback|AssertionError)" -C 5
+```
+
+### 3. Local Reproduction & Code Patch
+1. Isolate the failing test name or file from the stack trace.
+2. Run the exact test locally:
+   ```bash
+   pytest tests/test_failed_case.py -v -k "test_name"
+   ```
+3. Apply the targeted bug fix in the source code.
+4. Verify all tests pass locally (`make test`), then commit and push.
 
 ### github-issue-triage
-**Description**: Analyzes incoming GitHub issues, identifies duplicates, classifies bug vs feature, assigns appropriate labels/milestones, and drafts diagnostic or reproduction responses. Trigger with `/issue-triage [issue_number]`.
+**Description**: Analyzes incoming GitHub issues, identifies duplicates, classifies bug vs feature, assigns appropriate labels/milestones, and drafts diagnostic or reproduction responses using token-efficient gh CLI bash commands. Trigger with `/issue-triage [issue_number]`.
 
 # GitHub Issue Triage Skill
 
-Streamlines open-source and team issue triage by categorizing reports, checking for duplicate tickets, and formulating reproduction checklists.
+Triage bug reports and feature requests efficiently using lightweight `gh` CLI commands.
+
+> [!TIP]
+> **Token Optimization**: Use `gh issue view --json title,body,author` and `gh issue list --search` with jq/limit flags to extract only relevant fields.
 
 ## Workflow
 
-### 1. Fetch Issue Details
-- Retrieve issue body, author, existing labels, and comments:
-  ```bash
-  gh issue view <issue_number> --json number,title,body,author,labels,comments,createdAt
-  ```
+### 1. Inspect Issue Metadata
+```bash
+# Retrieve issue details cleanly
+gh issue view <issue_number> --json number,title,body,author,labels,createdAt
+```
 
-### 2. Duplicate Detection
-- Search repository for existing issues with similar keywords or error traces:
-  ```bash
-  gh issue list --search "<key_terms>" --state all --json number,title,state
-  ```
-- If a duplicate is identified, note the duplicate ID and prepare a closure reference.
+### 2. Search for Duplicate Issues
+```bash
+# Search open & closed issues matching core keywords (limited to top 5)
+gh issue list --search "<keyword1> <keyword2>" --state all --limit 5 --json number,title,state --jq '.[] | "#\(.number) [\(.state)] \(.title)"'
+```
 
-### 3. Classification & Triage Plan
-Classify into:
-- **Type**: `bug`, `feature-request`, `documentation`, `question`
-- **Severity**: `p0-critical`, `p1-high`, `p2-medium`, `p3-low`
-- **Component Area**: e.g., `area/cli`, `area/skills`, `area/mcp`, `area/ci`
+### 3. Classification & Label Application
+Determine:
+- **Type**: `bug`, `enhancement`, `documentation`, `question`
+- **Priority**: `p0-urgent`, `p1-high`, `p2-medium`, `p3-low`
+- **Area**: `area/cli`, `area/skills`, `area/mcp`, `area/core`
 
-### 4. Response Drafting & Action
-- If information is missing (reproduction steps, logs, OS version), draft a polite diagnostic template requesting clarification.
-- If bug is clear, assign appropriate labels:
-  ```bash
-  gh issue edit <issue_number> --add-label "bug,triage/accepted,area/cli"
-  ```
-- Post comment with reproduction verification or resolution roadmap:
-  ```bash
-  gh issue comment <issue_number> --body "<triage_response>"
-  ```
+Apply labels via `gh` CLI:
+```bash
+gh issue edit <issue_number> --add-label "bug,area/cli"
+```
+
+### 4. Post Diagnostic or Triage Reply
+If reproduction details or logs are missing:
+```bash
+gh issue comment <issue_number> --body "Thanks for reporting! Could you please share the exact CLI command used and your OS/Node version so we can reproduce?"
+```
 
 ### github-pr-create
-**Description**: Analyzes git diff and commit history, drafts semantic PR title and description with test verification and breaking change notices, and creates the pull request via GitHub CLI or MCP. Trigger with `/pr-create [title_or_target_branch]`.
+**Description**: Analyzes git diff and commit history, drafts semantic PR title and description with test verification and breaking change notices, and creates the pull request via token-efficient GitHub CLI (gh) bash commands. Trigger with `/pr-create [title_or_target_branch]`.
 
 # GitHub PR Creator Skill
 
-Automates end-to-end Pull Request generation following professional open-source and enterprise standards.
+Automates end-to-end Pull Request creation using fast, token-efficient `gh` CLI and `git` bash commands.
+
+> [!TIP]
+> **Token Optimization**: Always execute direct `gh` and `git` shell commands instead of invoking heavy MCP tools. Filter outputs to keep context compact.
 
 ## Workflow
 
-### 1. Git State Inspection
-- Check current branch: `git branch --show-current`
-- Verify working tree is clean and local commits are up-to-date:
-  ```bash
-  git status
-  git log origin/main..HEAD --oneline
-  ```
-- Generate complete diff against base branch:
-  ```bash
-  git diff origin/main...HEAD
-  ```
+### 1. Fast Git State Inspection
+Run lightweight bash commands:
+```bash
+# Check current branch
+CURRENT_BRANCH=$(git branch --show-current)
 
-### 2. Title & Description Generation
-Generate a semantic title adhering to **Conventional Commits**:
-- `feat(scope): ...` for new features
-- `fix(scope): ...` for bug fixes
-- `refactor(scope): ...` for structural changes without behavior alterations
-- `docs(scope): ...`, `test(scope): ...`, `chore(scope): ...`
+# Check staged/unstaged status cleanly
+git status --short
 
-Generate a structured description using the following template:
+# Check commit history since branching from main
+git log origin/main..HEAD --oneline
 
-```markdown
-## Summary
-Concise 2-3 sentence overview of what this PR does and why.
-
-## Proposed Changes
-- **Component / Module**: Bullet points detailing specific additions, deletions, or modifications.
-- **Architectural Notes**: Any design decisions or patterns introduced.
-
-## Breaking Changes
-- [ ] None / Details of breaking changes if any.
-
-## Verification & Testing
-- [x] Unit tests passed (`make test` / `pytest`)
-- [x] Manual verification performed (include steps or logs)
-
-## Related Issues
-Closes #<issue_number> (if applicable)
+# Inspect targeted diff (compact summary first)
+git diff --stat origin/main...HEAD
 ```
 
-### 3. Execution & PR Creation
-1. Push branch to remote:
-   ```bash
-   git push -u origin <current_branch>
-   ```
-2. Create PR using `gh` CLI:
-   ```bash
-   gh pr create --base main --title "<title>" --body "<body>"
-   ```
-   *(Or with `--draft` if requested)*
-3. Return the created PR URL and review summary to the user.
+### 2. Title & Description Generation
+Adhere to **Conventional Commits**:
+- `feat(scope): ...` for new features
+- `fix(scope): ...` for bug fixes
+- `refactor(scope): ...` for internal structural improvements
+- `docs(scope): ...`, `test(scope): ...`, `chore(scope): ...`
+
+Draft a clean, structured PR body:
+```markdown
+## Summary
+Concise 2-3 sentence overview of what this PR introduces and why.
+
+## Proposed Changes
+- **<Component>**: Specific bullet points of additions/modifications.
+- **Architectural Decisions**: Rationale for design choices.
+
+## Breaking Changes
+- [ ] None / Detailed description if breaking.
+
+## Verification & Testing
+- [x] Automated tests passing (`make test` / `pytest`)
+- [x] Manual verification performed
+
+## Related Issues
+Closes #<issue_number>
+```
+
+### 3. Push Branch & Create PR via `gh` CLI
+```bash
+# 1. Push branch to remote with upstream tracking
+git push -u origin "$CURRENT_BRANCH"
+
+# 2. Open Pull Request directly via gh CLI
+gh pr create \
+  --base main \
+  --title "<semantic_title>" \
+  --body "<structured_body>"
+
+# (Optional: for draft PRs, add --draft)
+```
+
+### 4. Output Summary
+Provide the user with the direct PR URL, title, and confirmation.
 
 ### github-pr-rebase
-**Description**: Rebases current branch or PR on top of target base branch, resolves merge conflicts, maintains clean linear history, and safely pushes with lease verification. Trigger with `/pr-rebase [base_branch]`.
+**Description**: Rebases current branch or PR on top of target base branch, resolves merge conflicts, maintains clean linear history, and safely pushes with lease verification using direct git and gh CLI bash commands. Trigger with `/pr-rebase [base_branch]`.
 
 # GitHub PR Rebase & Conflict Resolver Skill
 
-Maintains clean, linear git histories and automates upstream branch synchronization with safety guardrails.
+Maintains clean, linear git histories and synchronizes feature branches with upstream using fast, token-efficient `git` and `gh` shell commands.
 
-## Safety Rules & Principles
-1. **Never use blind `--force`**: Always use `--force-with-lease` to prevent overwriting remote commits pushed by collaborators.
-2. **Preserve working tree**: Stash or commit uncommitted local modifications before initiating a rebase.
-3. **Linear History**: Rebase feature branches rather than creating messy merge commits into PRs.
+> [!TIP]
+> **Token Optimization**: Use native `git` commands in shell. Avoid verbose logs; use `git status --short` and `git log --oneline -n 5` to preserve context tokens.
+
+## Safety Principles
+1. **Always use `--force-with-lease`**: Never use blind `--force` to prevent overwriting teammates' remote commits.
+2. **Linear History**: Rebase rather than creating cluttering merge commits.
+3. **Clean Working Tree**: Ensure `git status --short` is clean before rebasing.
 
 ## Workflow
 
-### 1. Fetch & Prepare
+### 1. Fetch & Check Branch Status
 ```bash
-# Ensure working directory is clean
-git status
+# Fetch latest remote state
+git fetch origin main --prune
 
-# Fetch latest changes from all remotes
-git fetch --all --prune
+# View incoming commits on main
+git log HEAD..origin/main --oneline
+
+# View current branch commits to be replayed
+git log origin/main..HEAD --oneline
 ```
 
-### 2. Execute Rebase
+### 2. Execute Git Rebase
 ```bash
-# Rebase current branch onto target base
+# Rebase feature branch on top of origin/main
 git rebase origin/main
 ```
 
-### 3. Merge Conflict Resolution (if conflicts occur)
-When conflicts arise:
-1. Identify conflicted files:
-   ```bash
-   git status --short
-   ```
-2. Analyze conflict markers (`<<<<<<< HEAD`, `=======`, `>>>>>>>`):
-   - Determine incoming vs current changes.
-   - Edit files to retain correct logic and remove conflict markers.
-3. Verify project integrity & run tests:
-   ```bash
-   make test # or pytest / npm test
-   ```
-4. Stage resolved files and continue rebase:
-   ```bash
-   git add <resolved_files>
-   git rebase --continue
-   ```
-   *(To abort safely if needed: `git rebase --abort`)*
-
-### 4. Push Updated Branch
+### 3. Handle Conflicts (if any)
 ```bash
-# Push rebased commits safely
+# 1. Identify conflicted files cleanly
+git diff --name-only --diff-filter=U
+
+# 2. Inspect conflict markers in specific files
+# (Edit files to resolve conflicts and remove <<<<<<< / ======= / >>>>>>> markers)
+
+# 3. Verify project build & tests
+make test # or pytest / npm test
+
+# 4. Stage resolved files and continue rebase
+git add <resolved_files>
+git rebase --continue
+
+# (Emergency rollback if needed: git rebase --abort)
+```
+
+### 4. Push Safely via `git`
+```bash
+# Safe force push protecting remote changes
 git push --force-with-lease origin HEAD
 ```
 
 ### github-pr-review
-**Description**: Fetches Pull Request diffs, reviews changes for security, performance, correctness, and architecture, and submits structured PR reviews (Approve, Comment, Request Changes) via GitHub CLI or MCP. Trigger with `/pr-review [pr_number_or_url]`.
+**Description**: Fetches Pull Request diffs, reviews changes for security, performance, correctness, and architecture, and submits structured PR reviews (Approve, Comment, Request Changes) using token-efficient GitHub CLI (gh) bash commands. Trigger with `/pr-review [pr_number_or_url]`.
 
 # GitHub PR Reviewer Skill
 
-Performs deep, senior-level code reviews on GitHub Pull Requests.
+Performs deep, senior-level code reviews on GitHub Pull Requests using lightweight, token-efficient `gh` CLI commands.
+
+> [!TIP]
+> **Token Optimization**: Use targeted `gh` JSON filters (`--json`) and diff limiters rather than dumping raw full repository payloads. Never use heavy MCP tool round-trips for PR reviews.
 
 ## Workflow
 
-### 1. Fetch PR Details & Diff
-- Retrieve PR metadata and checks:
-  ```bash
-  gh pr view <pr_number> --json title,body,author,baseRefName,headRefName,statusCheckRollup
-  ```
-- Fetch full diff:
-  ```bash
-  gh pr diff <pr_number>
-  ```
-- Inspect CI status: Check for failed jobs or test timeouts.
+### 1. Fetch PR Metadata & Compact Diff
+```bash
+# Fetch essential metadata (token-optimized JSON fields)
+gh pr view <pr_number> --json number,title,author,baseRefName,headRefName,statusCheckRollup,additions,deletions,changedFiles
+
+# Fetch changed files summary first
+gh pr view <pr_number> --json files --jq '.files[] | "\(.path) (+\(.additions) -\(.deletions))"'
+
+# Fetch the exact code diff
+gh pr diff <pr_number>
+```
 
 ### 2. Multi-Dimensional Review Rubric
 
-Review the diff across 5 critical dimensions:
-1. **Logic & Correctness**: Edge cases (empty strings, null values, division by zero, network timeouts), concurrency safety, off-by-one errors.
-2. **Security & Vulnerabilities**: Injection attacks (SQL/NoSQL/Command/XSS), unsanitized user input, secrets/tokens committed, improper authorization checks.
-3. **Performance & Scalability**: N+1 queries, memory leaks, algorithmic complexity ($O(N^2)$ vs $O(N)$), unindexed lookups.
-4. **Test Coverage & Reliability**: Are unit/integration tests included for new paths? Are tests deterministic (no flaky time/sleep dependencies)?
-5. **Architectural Consistency & Clean Code**: Separation of concerns, backwards compatibility, typing annotations, maintainability.
+Inspect changes across 5 senior-level dimensions:
+1. **Correctness & Logic**: Null safety, boundary values, error propagation, off-by-one errors, concurrency hazards.
+2. **Security & Vulnerabilities**: SQL/Command/XSS injection, unvalidated user inputs, hardcoded secrets/credentials, improper access control.
+3. **Performance & Scalability**: Inefficient loops, unindexed DB queries, memory leaks, algorithmic complexity ($O(N)$ vs $O(N^2)$).
+4. **Test Coverage**: Presence of unit/integration tests for new code paths, test determinism.
+5. **Architectural Cleanliness**: Separation of concerns, backwards compatibility, typing annotations, maintainability.
 
-### 3. Review Formulation & Submission
+### 3. Submit Structured Review via `gh` CLI
 
-Draft structured markdown comments:
-- Categorize feedback into:
-  - 🚨 **Blockers (Must-Fix)**: Security vulnerabilities, logic bugs, test regressions.
-  - 💡 **Suggestions (Non-Blocking)**: Refactoring opportunities, documentation improvements.
-  - 👏 **Positive Feedback**: Highlighting great design patterns or clean abstractions.
+Format feedback into:
+- 🚨 **Blockers (Must-Fix)**: Security issues, critical logic defects.
+- 💡 **Suggestions (Non-Blocking)**: Refactors, performance optimizations.
+- 👏 **Positive Feedback**: Commending clean abstractions.
 
-Submit review via `gh` CLI:
+Execute the review submission:
 ```bash
-# Submit as general comment
-gh pr review <pr_number> --comment --body "<review_markdown>"
+# Submit general review comment:
+gh pr review <pr_number> --comment --body "<markdown_review>"
 
-# Approve PR
-gh pr review <pr_number> --approve --body "<review_markdown>"
+# Submit approval:
+gh pr review <pr_number> --approve --body "<markdown_review>"
 
-# Request changes
-gh pr review <pr_number> --request-changes --body "<review_markdown>"
+# Request changes:
+gh pr review <pr_number> --request-changes --body "<markdown_review>"
 ```
 
 ### github-release-drafter
-**Description**: Extracts merged PRs, commits, and breaking changes since the latest git tag, generates semver release notes, and publishes GitHub releases with changelogs. Trigger with `/release-draft [version_tag]`.
+**Description**: Extracts merged PRs, commits, and breaking changes since the latest git tag, generates semver release notes, and publishes GitHub releases with changelogs using token-efficient gh CLI and git bash commands. Trigger with `/release-draft [version_tag]`.
 
 # GitHub Release Drafter Skill
 
-Automates semantic versioning release notes, changelog extraction, and GitHub Release publication.
+Generates semantic versioning changelogs and publishes GitHub Releases using direct, token-efficient `gh` CLI and `git` commands.
+
+> [!TIP]
+> **Token Optimization**: Use `gh pr list` and `git log` with targeted format specifiers to pull only commit subjects and PR titles, preventing giant payload dumps.
 
 ## Workflow
 
-### 1. Identify Release Scope & Commits
-- Locate latest git tag:
-  ```bash
-  git describe --tags --abbrev=0 2>/dev/null || echo "No previous tags"
-  ```
-- Collect all commits and merged PRs since previous tag:
-  ```bash
-  git log $(git describe --tags --abbrev=0 2>/dev/null)..HEAD --pretty=format:"* %s (%h)" --no-merges
-  ```
-- List merged pull requests via `gh` CLI:
-  ```bash
-  gh pr list --state merged --limit 30 --json number,title,author,labels,mergedAt
-  ```
-
-### 2. Categorize Changes & Determine SemVer
-Parse commit messages and PR titles into standard changelog sections:
-- 🚀 **Features**: New functionality (`feat: ...`)
-- 🐛 **Bug Fixes**: Fixes and patches (`fix: ...`)
-- ⚡ **Performance & Refactoring**: Optimizations (`perf: ...`, `refactor: ...`)
-- 💥 **Breaking Changes**: Non-backwards-compatible modifications (`BREAKING CHANGE: ...` or `feat!: ...`)
-- 📝 **Documentation & Chores**: Internal improvements (`docs: ...`, `chore: ...`)
-
-**Version Bump Heuristic**:
-- Breaking changes $\to$ **Major** bump (`vX.0.0`)
-- Features $\to$ **Minor** bump (`v0.X.0`)
-- Bug fixes only $\to$ **Patch** bump (`v0.0.X`)
-
-### 3. Generate Release Notes & Publish
-Draft markdown release notes and publish via `gh`:
+### 1. Scope Extraction via Git & `gh`
 ```bash
-gh release create <tag> \
-  --title "<tag> - <Release Title>" \
+# Find latest tag
+LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+# If tag exists, get commits since tag; otherwise get last 30 commits
+if [ -n "$LATEST_TAG" ]; then
+  git log "${LATEST_TAG}..HEAD" --oneline --no-merges
+else
+  git log -n 30 --oneline --no-merges
+fi
+
+# Fetch recent merged PRs in compact JSON format
+gh pr list --state merged --limit 20 --json number,title,author --jq '.[] | "- #\(.number) \(.title) (@\(.author.login))"'
+```
+
+### 2. Categorize Changes & SemVer Calculation
+Group entries into standard release sections:
+- 🚀 **Features**: New additions (`feat: ...`)
+- 🐛 **Bug Fixes**: Patches (`fix: ...`)
+- ⚡ **Performance & Refactoring**: Optimizations (`perf: ...`, `refactor: ...`)
+- 💥 **Breaking Changes**: Non-backwards compatible changes (`feat!: ...`, `BREAKING CHANGE`)
+- 📝 **Documentation & Chores**: Maintenance (`docs: ...`, `chore: ...`)
+
+**Version Determination**:
+- Breaking Changes $\to$ **Major** (`v2.0.0`)
+- Features $\to$ **Minor** (`v1.1.0`)
+- Fixes only $\to$ **Patch** (`v1.0.1`)
+
+### 3. Publish Release via `gh` CLI
+```bash
+gh release create <tag_name> \
+  --title "<tag_name> - <Release Title>" \
   --notes "<markdown_changelog>" \
   --draft
 ```
+*(Remove `--draft` flag when publishing live production releases)*
 
 ### job-matcher
 **Description**: Extracts, evaluates, and ranks job postings against candidate resumes using an intelligent Hybrid Scrape & Cache layer (SQLite + BeautifulSoup + Firecrawl MCP fallback) and local or cloud LLM scoring. Trigger with `/jobmatch [resume_path] [optional_keywords]` or `/jobhunt [resume_path]`.

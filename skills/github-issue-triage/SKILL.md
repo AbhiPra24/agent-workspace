@@ -2,7 +2,8 @@
 name: github-issue-triage
 description: >-
   Analyzes incoming GitHub issues, identifies duplicates, classifies bug vs feature,
-  assigns appropriate labels/milestones, and drafts diagnostic or reproduction responses.
+  assigns appropriate labels/milestones, and drafts diagnostic or reproduction responses
+  using token-efficient gh CLI bash commands.
   Trigger with `/issue-triage [issue_number]`.
 parameters:
   issue:
@@ -17,36 +18,38 @@ parameters:
 
 # GitHub Issue Triage Skill
 
-Streamlines open-source and team issue triage by categorizing reports, checking for duplicate tickets, and formulating reproduction checklists.
+Triage bug reports and feature requests efficiently using lightweight `gh` CLI commands.
+
+> [!TIP]
+> **Token Optimization**: Use `gh issue view --json title,body,author` and `gh issue list --search` with jq/limit flags to extract only relevant fields.
 
 ## Workflow
 
-### 1. Fetch Issue Details
-- Retrieve issue body, author, existing labels, and comments:
-  ```bash
-  gh issue view <issue_number> --json number,title,body,author,labels,comments,createdAt
-  ```
+### 1. Inspect Issue Metadata
+```bash
+# Retrieve issue details cleanly
+gh issue view <issue_number> --json number,title,body,author,labels,createdAt
+```
 
-### 2. Duplicate Detection
-- Search repository for existing issues with similar keywords or error traces:
-  ```bash
-  gh issue list --search "<key_terms>" --state all --json number,title,state
-  ```
-- If a duplicate is identified, note the duplicate ID and prepare a closure reference.
+### 2. Search for Duplicate Issues
+```bash
+# Search open & closed issues matching core keywords (limited to top 5)
+gh issue list --search "<keyword1> <keyword2>" --state all --limit 5 --json number,title,state --jq '.[] | "#\(.number) [\(.state)] \(.title)"'
+```
 
-### 3. Classification & Triage Plan
-Classify into:
-- **Type**: `bug`, `feature-request`, `documentation`, `question`
-- **Severity**: `p0-critical`, `p1-high`, `p2-medium`, `p3-low`
-- **Component Area**: e.g., `area/cli`, `area/skills`, `area/mcp`, `area/ci`
+### 3. Classification & Label Application
+Determine:
+- **Type**: `bug`, `enhancement`, `documentation`, `question`
+- **Priority**: `p0-urgent`, `p1-high`, `p2-medium`, `p3-low`
+- **Area**: `area/cli`, `area/skills`, `area/mcp`, `area/core`
 
-### 4. Response Drafting & Action
-- If information is missing (reproduction steps, logs, OS version), draft a polite diagnostic template requesting clarification.
-- If bug is clear, assign appropriate labels:
-  ```bash
-  gh issue edit <issue_number> --add-label "bug,triage/accepted,area/cli"
-  ```
-- Post comment with reproduction verification or resolution roadmap:
-  ```bash
-  gh issue comment <issue_number> --body "<triage_response>"
-  ```
+Apply labels via `gh` CLI:
+```bash
+gh issue edit <issue_number> --add-label "bug,area/cli"
+```
+
+### 4. Post Diagnostic or Triage Reply
+If reproduction details or logs are missing:
+```bash
+gh issue comment <issue_number> --body "Thanks for reporting! Could you please share the exact CLI command used and your OS/Node version so we can reproduce?"
+```

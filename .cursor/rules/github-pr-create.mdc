@@ -1,5 +1,5 @@
 ---
-description: Analyzes git diff and commit history, drafts semantic PR title and description with test verification and breaking change notices, and creates the pull request via GitHub CLI or MCP. Trigger with `/pr-create [title_or_target_branch]`.
+description: Analyzes git diff and commit history, drafts semantic PR title and description with test verification and breaking change notices, and creates the pull request via token-efficient GitHub CLI (gh) bash commands. Trigger with `/pr-create [title_or_target_branch]`.
 globs: *
 alwaysApply: false
 ---
@@ -8,58 +8,69 @@ alwaysApply: false
 
 # GitHub PR Creator Skill
 
-Automates end-to-end Pull Request generation following professional open-source and enterprise standards.
+Automates end-to-end Pull Request creation using fast, token-efficient `gh` CLI and `git` bash commands.
+
+> [!TIP]
+> **Token Optimization**: Always execute direct `gh` and `git` shell commands instead of invoking heavy MCP tools. Filter outputs to keep context compact.
 
 ## Workflow
 
-### 1. Git State Inspection
-- Check current branch: `git branch --show-current`
-- Verify working tree is clean and local commits are up-to-date:
-  ```bash
-  git status
-  git log origin/main..HEAD --oneline
-  ```
-- Generate complete diff against base branch:
-  ```bash
-  git diff origin/main...HEAD
-  ```
+### 1. Fast Git State Inspection
+Run lightweight bash commands:
+```bash
+# Check current branch
+CURRENT_BRANCH=$(git branch --show-current)
 
-### 2. Title & Description Generation
-Generate a semantic title adhering to **Conventional Commits**:
-- `feat(scope): ...` for new features
-- `fix(scope): ...` for bug fixes
-- `refactor(scope): ...` for structural changes without behavior alterations
-- `docs(scope): ...`, `test(scope): ...`, `chore(scope): ...`
+# Check staged/unstaged status cleanly
+git status --short
 
-Generate a structured description using the following template:
+# Check commit history since branching from main
+git log origin/main..HEAD --oneline
 
-```markdown
-## Summary
-Concise 2-3 sentence overview of what this PR does and why.
-
-## Proposed Changes
-- **Component / Module**: Bullet points detailing specific additions, deletions, or modifications.
-- **Architectural Notes**: Any design decisions or patterns introduced.
-
-## Breaking Changes
-- [ ] None / Details of breaking changes if any.
-
-## Verification & Testing
-- [x] Unit tests passed (`make test` / `pytest`)
-- [x] Manual verification performed (include steps or logs)
-
-## Related Issues
-Closes #<issue_number> (if applicable)
+# Inspect targeted diff (compact summary first)
+git diff --stat origin/main...HEAD
 ```
 
-### 3. Execution & PR Creation
-1. Push branch to remote:
-   ```bash
-   git push -u origin <current_branch>
-   ```
-2. Create PR using `gh` CLI:
-   ```bash
-   gh pr create --base main --title "<title>" --body "<body>"
-   ```
-   *(Or with `--draft` if requested)*
-3. Return the created PR URL and review summary to the user.
+### 2. Title & Description Generation
+Adhere to **Conventional Commits**:
+- `feat(scope): ...` for new features
+- `fix(scope): ...` for bug fixes
+- `refactor(scope): ...` for internal structural improvements
+- `docs(scope): ...`, `test(scope): ...`, `chore(scope): ...`
+
+Draft a clean, structured PR body:
+```markdown
+## Summary
+Concise 2-3 sentence overview of what this PR introduces and why.
+
+## Proposed Changes
+- **<Component>**: Specific bullet points of additions/modifications.
+- **Architectural Decisions**: Rationale for design choices.
+
+## Breaking Changes
+- [ ] None / Detailed description if breaking.
+
+## Verification & Testing
+- [x] Automated tests passing (`make test` / `pytest`)
+- [x] Manual verification performed
+
+## Related Issues
+Closes #<issue_number>
+```
+
+### 3. Push Branch & Create PR via `gh` CLI
+```bash
+# 1. Push branch to remote with upstream tracking
+git push -u origin "$CURRENT_BRANCH"
+
+# 2. Open Pull Request directly via gh CLI
+gh pr create \
+  --base main \
+  --title "<semantic_title>" \
+  --body "<structured_body>"
+
+# (Optional: for draft PRs, add --draft)
+```
+
+### 4. Output Summary
+Provide the user with the direct PR URL, title, and confirmation.

@@ -2,7 +2,8 @@
 name: github-release-drafter
 description: >-
   Extracts merged PRs, commits, and breaking changes since the latest git tag,
-  generates semver release notes, and publishes GitHub releases with changelogs.
+  generates semver release notes, and publishes GitHub releases with changelogs
+  using token-efficient gh CLI and git bash commands.
   Trigger with `/release-draft [version_tag]`.
 parameters:
   tag:
@@ -17,42 +18,47 @@ parameters:
 
 # GitHub Release Drafter Skill
 
-Automates semantic versioning release notes, changelog extraction, and GitHub Release publication.
+Generates semantic versioning changelogs and publishes GitHub Releases using direct, token-efficient `gh` CLI and `git` commands.
+
+> [!TIP]
+> **Token Optimization**: Use `gh pr list` and `git log` with targeted format specifiers to pull only commit subjects and PR titles, preventing giant payload dumps.
 
 ## Workflow
 
-### 1. Identify Release Scope & Commits
-- Locate latest git tag:
-  ```bash
-  git describe --tags --abbrev=0 2>/dev/null || echo "No previous tags"
-  ```
-- Collect all commits and merged PRs since previous tag:
-  ```bash
-  git log $(git describe --tags --abbrev=0 2>/dev/null)..HEAD --pretty=format:"* %s (%h)" --no-merges
-  ```
-- List merged pull requests via `gh` CLI:
-  ```bash
-  gh pr list --state merged --limit 30 --json number,title,author,labels,mergedAt
-  ```
-
-### 2. Categorize Changes & Determine SemVer
-Parse commit messages and PR titles into standard changelog sections:
-- 🚀 **Features**: New functionality (`feat: ...`)
-- 🐛 **Bug Fixes**: Fixes and patches (`fix: ...`)
-- ⚡ **Performance & Refactoring**: Optimizations (`perf: ...`, `refactor: ...`)
-- 💥 **Breaking Changes**: Non-backwards-compatible modifications (`BREAKING CHANGE: ...` or `feat!: ...`)
-- 📝 **Documentation & Chores**: Internal improvements (`docs: ...`, `chore: ...`)
-
-**Version Bump Heuristic**:
-- Breaking changes $\to$ **Major** bump (`vX.0.0`)
-- Features $\to$ **Minor** bump (`v0.X.0`)
-- Bug fixes only $\to$ **Patch** bump (`v0.0.X`)
-
-### 3. Generate Release Notes & Publish
-Draft markdown release notes and publish via `gh`:
+### 1. Scope Extraction via Git & `gh`
 ```bash
-gh release create <tag> \
-  --title "<tag> - <Release Title>" \
+# Find latest tag
+LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+# If tag exists, get commits since tag; otherwise get last 30 commits
+if [ -n "$LATEST_TAG" ]; then
+  git log "${LATEST_TAG}..HEAD" --oneline --no-merges
+else
+  git log -n 30 --oneline --no-merges
+fi
+
+# Fetch recent merged PRs in compact JSON format
+gh pr list --state merged --limit 20 --json number,title,author --jq '.[] | "- #\(.number) \(.title) (@\(.author.login))"'
+```
+
+### 2. Categorize Changes & SemVer Calculation
+Group entries into standard release sections:
+- 🚀 **Features**: New additions (`feat: ...`)
+- 🐛 **Bug Fixes**: Patches (`fix: ...`)
+- ⚡ **Performance & Refactoring**: Optimizations (`perf: ...`, `refactor: ...`)
+- 💥 **Breaking Changes**: Non-backwards compatible changes (`feat!: ...`, `BREAKING CHANGE`)
+- 📝 **Documentation & Chores**: Maintenance (`docs: ...`, `chore: ...`)
+
+**Version Determination**:
+- Breaking Changes $\to$ **Major** (`v2.0.0`)
+- Features $\to$ **Minor** (`v1.1.0`)
+- Fixes only $\to$ **Patch** (`v1.0.1`)
+
+### 3. Publish Release via `gh` CLI
+```bash
+gh release create <tag_name> \
+  --title "<tag_name> - <Release Title>" \
   --notes "<markdown_changelog>" \
   --draft
 ```
+*(Remove `--draft` flag when publishing live production releases)*

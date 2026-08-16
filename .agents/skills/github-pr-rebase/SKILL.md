@@ -2,7 +2,8 @@
 name: github-pr-rebase
 description: >-
   Rebases current branch or PR on top of target base branch, resolves merge conflicts,
-  maintains clean linear history, and safely pushes with lease verification.
+  maintains clean linear history, and safely pushes with lease verification using
+  direct git and gh CLI bash commands.
   Trigger with `/pr-rebase [base_branch]`.
 parameters:
   base:
@@ -17,52 +18,56 @@ parameters:
 
 # GitHub PR Rebase & Conflict Resolver Skill
 
-Maintains clean, linear git histories and automates upstream branch synchronization with safety guardrails.
+Maintains clean, linear git histories and synchronizes feature branches with upstream using fast, token-efficient `git` and `gh` shell commands.
 
-## Safety Rules & Principles
-1. **Never use blind `--force`**: Always use `--force-with-lease` to prevent overwriting remote commits pushed by collaborators.
-2. **Preserve working tree**: Stash or commit uncommitted local modifications before initiating a rebase.
-3. **Linear History**: Rebase feature branches rather than creating messy merge commits into PRs.
+> [!TIP]
+> **Token Optimization**: Use native `git` commands in shell. Avoid verbose logs; use `git status --short` and `git log --oneline -n 5` to preserve context tokens.
+
+## Safety Principles
+1. **Always use `--force-with-lease`**: Never use blind `--force` to prevent overwriting teammates' remote commits.
+2. **Linear History**: Rebase rather than creating cluttering merge commits.
+3. **Clean Working Tree**: Ensure `git status --short` is clean before rebasing.
 
 ## Workflow
 
-### 1. Fetch & Prepare
+### 1. Fetch & Check Branch Status
 ```bash
-# Ensure working directory is clean
-git status
+# Fetch latest remote state
+git fetch origin main --prune
 
-# Fetch latest changes from all remotes
-git fetch --all --prune
+# View incoming commits on main
+git log HEAD..origin/main --oneline
+
+# View current branch commits to be replayed
+git log origin/main..HEAD --oneline
 ```
 
-### 2. Execute Rebase
+### 2. Execute Git Rebase
 ```bash
-# Rebase current branch onto target base
+# Rebase feature branch on top of origin/main
 git rebase origin/main
 ```
 
-### 3. Merge Conflict Resolution (if conflicts occur)
-When conflicts arise:
-1. Identify conflicted files:
-   ```bash
-   git status --short
-   ```
-2. Analyze conflict markers (`<<<<<<< HEAD`, `=======`, `>>>>>>>`):
-   - Determine incoming vs current changes.
-   - Edit files to retain correct logic and remove conflict markers.
-3. Verify project integrity & run tests:
-   ```bash
-   make test # or pytest / npm test
-   ```
-4. Stage resolved files and continue rebase:
-   ```bash
-   git add <resolved_files>
-   git rebase --continue
-   ```
-   *(To abort safely if needed: `git rebase --abort`)*
-
-### 4. Push Updated Branch
+### 3. Handle Conflicts (if any)
 ```bash
-# Push rebased commits safely
+# 1. Identify conflicted files cleanly
+git diff --name-only --diff-filter=U
+
+# 2. Inspect conflict markers in specific files
+# (Edit files to resolve conflicts and remove <<<<<<< / ======= / >>>>>>> markers)
+
+# 3. Verify project build & tests
+make test # or pytest / npm test
+
+# 4. Stage resolved files and continue rebase
+git add <resolved_files>
+git rebase --continue
+
+# (Emergency rollback if needed: git rebase --abort)
+```
+
+### 4. Push Safely via `git`
+```bash
+# Safe force push protecting remote changes
 git push --force-with-lease origin HEAD
 ```
