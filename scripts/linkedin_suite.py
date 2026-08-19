@@ -21,7 +21,12 @@ import time
 import uuid
 import socket
 import logging
+import warnings
 import argparse
+
+# Suppress all library runtime warnings (e.g. urllib3 LibreSSL warnings)
+warnings.filterwarnings("ignore")
+os.environ["PYTHONWARNINGS"] = "ignore"
 import http.server
 import socketserver
 import urllib.parse
