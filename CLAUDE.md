@@ -443,6 +443,185 @@ Every robust prompt should include:
 - **XML / Markdown Delimiters**: Use tags like `<user_query>`, `<context>`, `<rules>` to eliminate prompt injection and confusion.
 - **Edge-Case Anchoring**: Provide explicit fallback actions when data is missing or ambiguous.
 
+### resume-builder
+**Description**: Ingests candidate background info from any source (.pdf, .docx, .txt, .md, .tex, or raw notes), applies deep ATS heuristics & Google XYZ metric quantification, generates crystal-clear modern LaTeX resumes, and provides bidirectional conversion to/from LaTeX (Markdown, Text, JSON, PDF). Trigger with `/resume-build [input_path]` or `/resume [input_path]`.
+
+# ATS Resume Architect & Bidirectional LaTeX Converter Skill
+
+Transforms raw candidate documents or unstructured experience notes into high-impact, ATS-optimized, crystal-clear LaTeX resumes with full bidirectional format conversion.
+
+## Core Capabilities
+1. **Multi-Format Ingestion**: Extracts text from `.pdf`, `.docx`, `.md`, `.txt`, `.tex`, `.json`, or unformatted input notes.
+2. **Bidirectional Format Conversion**:
+   - **TO LaTeX**: Converts `.pdf`, `.docx`, `.md`, `.txt`, or `.json` into production-ready `.tex`.
+   - **FROM LaTeX**: Converts `.tex` resumes into clean GitHub Markdown (`.md`), plain text (`.txt` for forms), structured JSON (`.json`), or compiled `.pdf`.
+3. **ATS Heuristic Audit Engine**: Scores resumes (0–100) across Structure, Metric Quantification, Action Verbs, and Readability.
+4. **Google XYZ Formula Transformer**: Restructures weak, passive bullet points into high-impact accomplishments (*"Accomplished [X] as measured by [Y], by doing [Z]"*).
+5. **Modern LaTeX Generation**: Emits clean, production-grade LaTeX utilizing `titlesec`, `geometry`, `enumitem`, and legible modern sans-serif typography (`\renewcommand{\familydefault}{\sfdefault}`).
+6. **Compilation Bridge**: Automatically builds `.pdf` output when `pdflatex`, `xelatex`, or `tectonic` are present.
+
+---
+
+## The 4 Pillars of High ATS Score & Readability
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        ATS OPTIMIZATION MATRIX                         │
+├────────────────────────┬───────────────────────────────────────────────┤
+│ 1. 100% Parseable      │ • Single-column layout ONLY (no sidebar/grid) │
+│    Structure           │ • Standard headers (Summary, Experience, etc.)│
+│                        │ • Standard fonts (Computer Modern / Helvetica)│
+├────────────────────────┼───────────────────────────────────────────────┤
+│ 2. Quantified Impact   │ • Google XYZ formula: Metric in >= 50% bullets│
+│    (Metrics)           │ • Quantifiers: %, $, 2x, 100+, latency ms     │
+├────────────────────────┼───────────────────────────────────────────────┤
+│ 3. Strong Action Verbs │ • Start every bullet with strong active verb  │
+│                        │ • Zero passive phrases ("responsible for...") │
+├────────────────────────┼───────────────────────────────────────────────┤
+│ 4. Keyword Alignment   │ • Clear Categorized Skills (Languages, Infra) │
+│                        │ • Exact industry standard tech keywords       │
+└────────────────────────┴───────────────────────────────────────────────┘
+```
+
+---
+
+## Bidirectional Conversion Workflows
+
+### 1. Convert LaTeX to Markdown / Plain Text / JSON / PDF
+```bash
+# Convert LaTeX to Markdown
+python3 scripts/resume_builder.py convert --input resume.tex --to md --output resume.md
+
+# Convert LaTeX to Plain Text (for job portal copy-paste)
+python3 scripts/resume_builder.py convert --input resume.tex --to txt --output resume.txt
+
+# Convert LaTeX to Structured JSON
+python3 scripts/resume_builder.py convert --input resume.tex --to json --output resume.json
+
+# Convert LaTeX to PDF
+python3 scripts/resume_builder.py convert --input resume.tex --to pdf
+```
+
+### 2. Convert Markdown / JSON / PDF / DOCX to LaTeX
+```bash
+# Convert Markdown to LaTeX
+python3 scripts/resume_builder.py convert --input resume.md --to latex --output resume.tex
+
+# Convert JSON to LaTeX
+python3 scripts/resume_builder.py convert --input resume.json --to latex --output resume.tex
+
+# Ingest PDF/DOCX and build ATS-optimized LaTeX
+python3 scripts/resume_builder.py build --input resume.pdf --output resume.tex
+```
+
+---
+
+## Step-by-Step Agent Execution Workflow
+
+When user invokes `/resume-build [file_path]` or asks to craft/tailor/convert a resume:
+
+### Phase 1: Ingest & Extract
+Extract plain text and structural signals from the input document:
+```bash
+python3 scripts/resume_builder.py extract --input <path_to_input_file>
+```
+
+### Phase 2: ATS Pre-Audit & Analysis
+Run the built-in diagnostic audit to identify gaps in metrics, weak verbs, or structure:
+```bash
+python3 scripts/resume_builder.py audit --input <path_to_input_file>
+```
+
+### Phase 3: Content Transformation & Metric Hardening
+1. **Apply Google XYZ Formula**:
+   - ❌ *Weak*: "Worked on automation frameworks and ran test suites for EV charging."
+   - ✅ *Strong*: "Architected modular BDD automation frameworks (Python/Behave) and integrated into Jenkins CI/CD pipelines, achieving **40% faster execution** across deployment cycles."
+2. **Prioritize Technical Ownership**: Emphasize architectural initiatives, tooling creation, DevSecOps/security validation, and reliability improvements.
+3. **Categorize Technical Skills**: Group skills logically into clean lines (e.g., *Frameworks & Languages*, *DevOps & Infrastructure*, *Databases & Security*, *Protocols & APIs*).
+
+### Phase 4: LaTeX Code Generation & Review
+Generate the standardized LaTeX file with tight margin spacing and clean formatting:
+```bash
+python3 scripts/resume_builder.py build --input <path_to_input_file> --output <output_path.tex>
+```
+
+---
+
+## Canonical LaTeX Structure Template
+
+```latex
+\documentclass[a4paper,10pt]{article}
+\usepackage[margin=0.5in]{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+% Clean, modern Sans-Serif Font
+\renewcommand{\familydefault}{\sfdefault}
+
+% Section formatting: Uppercase with crisp divider rule
+\titleformat{\section}{\large\bfseries\uppercase}{}{0em}{}[\titlerule]
+\titlespacing*{\section}{0pt}{1.2ex plus 1ex minus .2ex}{0.8ex plus .2ex}
+
+% Dense, readable itemized list
+\setlist[itemize]{noitemsep, topsep=2pt, leftmargin=1.5em, parsep=0pt, partopsep=0pt}
+
+\begin{document}
+
+%----------------------------
+% Name and Contact
+%----------------------------
+\begin{center}
+    {\Huge \textbf{Candidate Name}}\\[4pt]
+    \href{mailto:email@example.com}{email@example.com} \,|\,
+    +91 99999 99999 \,|\,
+    Location, Country \,|\,
+    \href{https://linkedin.com/in/profile}{linkedin.com/in/profile} \,|\,
+    \href{https://github.com/profile}{github.com/profile}
+\end{center}
+
+%----------------------------
+\section{Summary}
+\begin{itemize}
+    \item Senior Engineer with \textbf{5+ years} of experience architecting scalable test systems and CI/CD pipelines.
+    \item Track record of building shared developer tools, reducing triage time by 30\% across cross-functional teams.
+\end{itemize}
+
+%----------------------------
+\section{Experience}
+\textbf{Senior Software Engineer} \hfill \textit{Apr 2024 -- Present}\\
+Company Name, Location
+\begin{itemize}
+    \item Spearheaded system architecture and pipeline automation, achieving \textbf{40\% faster deployment cycles}.
+    \item Architected internal utilities in Python and FastAPI, cutting defect triage time by 30\%.
+\end{itemize}
+
+%----------------------------
+\section{Education}
+\textbf{B.Tech, Computer Science} \hfill \textit{2018 -- 2022}\\
+Institute / University Name
+
+%----------------------------
+\section{Skills}
+\textbf{Languages \& Frameworks:} Python, Java, FastAPI, Pytest, Playwright\\
+\textbf{DevOps \& Infrastructure:} Docker, Jenkins, Linux CLI, Git, CI/CD\\
+\textbf{Protocols \& Security:} REST API, Postman, Wireshark, Burp Suite
+
+\end{document}
+```
+
+---
+
+## CLI Reference
+
+| Command | Usage | Description |
+|---|---|---|
+| `audit` | `python3 scripts/resume_builder.py audit -i <file>` | Runs 100-point ATS evaluation |
+| `convert` | `python3 scripts/resume_builder.py convert -i <file> -t [md|txt|json|latex|pdf]` | Bidirectional format converter |
+| `build` | `python3 scripts/resume_builder.py build -i <file> -o resume.tex` | Generates ATS-optimized LaTeX |
+| `extract` | `python3 scripts/resume_builder.py extract -i <file>` | Dumps raw text from PDF/DOCX |
+| `compile` | `python3 scripts/resume_builder.py compile -i resume.tex` | Compiles LaTeX to PDF |
+
 ### web-researcher
 **Description**: Performs multi-step, autonomous web research, documentation lookup, fact verification, and synthesizes findings into structured technical summaries or comparison tables. Trigger with `/research [query]`.
 

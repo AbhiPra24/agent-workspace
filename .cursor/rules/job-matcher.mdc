@@ -1,20 +1,22 @@
 ---
-description: Extracts, evaluates, and ranks job postings against candidate resumes using an intelligent Hybrid Scrape & Cache layer (SQLite + BeautifulSoup + Firecrawl MCP fallback) and local or cloud LLM scoring. Trigger with `/jobmatch [resume_path] [optional_keywords]` or `/jobhunt [resume_path]`.
+description: Extracts, evaluates, and ranks job postings against candidate resumes using an intelligent Hybrid Scrape & Cache layer (SQLite + BeautifulSoup + Firecrawl MCP fallback), discovers active recruiters, and strictly verifies email deliverability (DNS/MX validation & anti-bounce guardrails). Trigger with `/jobmatch [resume_path] [optional_keywords]` or `/jobhunt [resume_path]`.
 globs: *
 alwaysApply: false
 ---
 
-# Job Matcher
+# Job Matcher & Email Deliverability Guardrail
 
-# Job Matcher Skill (Hybrid Scrape & Cache)
-
-Evaluates job descriptions against a candidate resume with strict, transparent technical scoring and aggressive API budget conservation.
+Evaluates job descriptions against a candidate resume with strict, transparent technical scoring, API budget conservation, and **double-checked recruiter email intelligence**.
 
 ## Features
 1. **SQLite Database Caching**: Scraped job descriptions and calculated match scores are persisted in SQLite cache. Subsequent runs on identical URLs return instant results at 0 credit and 0 token cost.
 2. **Cheap-First BeautifulSoup Scraper**: Fetches and parses standard career pages (Greenhouse, Lever, Workable, etc.) locally using `requests` + `BeautifulSoup` to avoid burning API credits on basic pages.
 3. **Targeted Firecrawl Execution**: Falls back to Firecrawl `/scrape` only when pages require JavaScript rendering or encounter cloud anti-bot challenges.
 4. **Credit Budget Guardrail**: Monitors API consumption and warns before exceeding limits.
+5. **Mandatory Recruiter Email Double-Checking**:
+   - **DNS / MX Verification**: Confirms the recipient domain resolves in DNS and has active mail servers.
+   - **Anti-Bounce Catch-All Filter**: Prohibits unmonitored generic prefixes (`recruiting@`, `hiring@`, `careers@`, `jobs@`, `info@`) that trigger DSN delivery failure alerts.
+   - **Named Personnel Targeting**: Discovers and verifies currently active Technical Recruiters, Talent Acquisition Leads, and Engineering Directors with verified corporate syntax (`first.last@domain` or `flast@domain`).
 
 ## Execution
 
@@ -27,6 +29,14 @@ python3 scripts/job_matcher.py --resume <path_to_resume> [options]
 ### CLI Options
 - `--resume <path>`: Path to resume file (`.pdf`, `.txt`, `.md`).
 - `--query <text>`: Target job search keywords (e.g., `"Senior Backend Engineer"`, `"SDET Lead"`).
-- `--location <text>`: Target location filter (e.g., `"Remote"`, `"New York"`, `"London"`).
+- `--location <text>`: Target location filter (e.g., `"Remote"`, `"Gurugram"`, `"London"`).
 - `--limit <int>`: Number of listings to process (default: 5).
 - `--dry-run`: Parse resume and print search query without external network requests.
+
+## Cold Outreach Email Verification Checklist
+Before outputting or proposing any outreach email to the user:
+- [x] Syntax conforms to RFC 5322.
+- [x] Recipient domain has valid DNS/MX resolution.
+- [x] Avoids generic unmonitored aliases (`recruiting@`, `hiring@`, `careers@`).
+- [x] Recruiter/Hiring Lead confirmed active in role.
+- [x] Verified secondary fallback email or direct ATS link provided.
