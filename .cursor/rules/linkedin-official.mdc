@@ -1,0 +1,34 @@
+---
+description: Rules for generating and interacting with LinkedIn Official APIs, FastMCP tools, and publishing CLI
+globs: scripts/linkedin_*.py, linkedin_suite/**/*, skills/linkedin-*/**/*, tests/test_linkedin_*.py
+---
+
+# LinkedIn Official API Rules & Guardrails
+
+When working with LinkedIn API integrations, MCP servers, or automated agents, strictly follow these compliance standards:
+
+## 1. Zero Legacy Endpoints
+- **NEVER** generate requests to `/v2/ugcPosts` or `/v2/shares`.
+- **ALWAYS** use the modern `/rest/posts` endpoint for publishing text, articles, single images, multi-image carousels, and videos.
+
+## 2. Mandatory Versioning Headers
+Every HTTP request to LinkedIn REST endpoints MUST inject:
+- `LinkedIn-Version: 202401` (or latest monthly format)
+- `X-Restli-Protocol-Version: 2.0.0`
+- `Authorization: Bearer <ACCESS_TOKEN>`
+- `Content-Type: application/json`
+
+## 3. Mandatory Idempotency Keys on Mutations
+Every `POST` request MUST include a cryptographically unique UUID in the `X-RestLi-Idempotency-Key` header to prevent duplicate posts during agent network retries or timeouts.
+
+## 4. Two-Step Media Protocol
+Do not attempt to inline binary data into `/rest/posts`. Always follow:
+1. `POST /rest/images?action=initializeUpload` to get `uploadUrl` and media URN.
+2. Binary `PUT` directly to `uploadUrl`.
+3. Reference `urn:li:image:...` in `/rest/posts` content payload.
+
+## 5. Rich Dry-Run Terminal Guardrails
+All CLI commands that create posts MUST render a Rich visual preview (hook line, character count vs 3000 limit, target author URN, hashtags) and require explicit user confirmation (`[y/N]`) before transmitting live payloads.
+
+## 6. 365-Day Token Refresh Lifecycle
+Do not force browser re-authentication every 60 days. Cache the 365-day `refresh_token` and use `grant_type=refresh_token` to renew access tokens automatically in the background.

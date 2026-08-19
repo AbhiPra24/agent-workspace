@@ -1,0 +1,65 @@
+---
+name: linkedin-publish
+description: >-
+  Drafts, audits, and publishes high-impact posts to LinkedIn using the official REST API (/rest/posts),
+  enforcing global versioning headers, automatic idempotency keys, and interactive Rich terminal previews
+  with dry-run confirmation before live transmission.
+parameters:
+  text:
+    type: string
+    description: Post commentary content or topic to draft
+    required: false
+  file:
+    type: string
+    description: Path to file containing draft text
+    required: false
+  media:
+    type: string
+    description: Path to image file to attach
+    required: false
+  link:
+    type: string
+    description: Web URL to attach as an article preview
+    required: false
+  visibility:
+    type: string
+    description: Visibility tier (PUBLIC | CONNECTIONS)
+    default: PUBLIC
+  yes:
+    type: boolean
+    description: Bypass dry-run terminal confirmation prompt
+    default: false
+---
+
+# LinkedIn Official Publisher Skill
+
+Executes 100% compliant post publishing via LinkedIn's official `/rest/posts` API with built-in character limit validation, visual previews, and idempotency protection.
+
+## Execution Workflow
+
+### 1. Draft or Preview Post
+To format and preview a post with character count and hashtag analysis:
+```bash
+python3 linkedin_suite/src/cli.py publish --text "Your post content #python #ai"
+```
+
+### 2. Publish with Media Attachment
+```bash
+python3 linkedin_suite/src/cli.py publish --text "Exploring new AI architectures" --media path/to/image.png
+```
+
+### 3. Check Authenticated Identity & URN
+```bash
+python3 linkedin_suite/src/cli.py profile
+```
+
+### 4. Rotate 365-Day Token
+```bash
+python3 linkedin_suite/src/cli.py refresh
+```
+
+## Architectural Guardrails Enforced
+- Exclusively targets `POST /rest/posts`.
+- Injects `LinkedIn-Version: 202401` and `X-Restli-Protocol-Version: 2.0.0` headers globally.
+- Injects a unique `X-RestLi-Idempotency-Key` UUID on every POST request to prevent duplicate submissions.
+- Prompts for explicit `[y/N]` confirmation in the console before making any live network calls.
