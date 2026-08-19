@@ -6,6 +6,7 @@ Features:
 - Mandatory API versioning headers: `LinkedIn-Version: 202401`, `X-Restli-Protocol-Version: 2.0.0`
 - Automatic UUID `X-RestLi-Idempotency-Key` headers on all POST mutations
 - Modern `/rest/posts` distribution and 2-step `/rest/images` upload pipeline
+- Automatic pre-flight self-healing authentication (silent refresh & auto-OAuth browser login)
 - Automatic 401 Unauthorized silent token refresh & retry interceptor
 - Pre-signed S3 upload header stripping (prevents signature mismatch)
 - Dynamic OAuth port conflict resolution (ports 8080-8089)
@@ -21,6 +22,7 @@ import time
 import uuid
 import socket
 import logging
+import warnings
 import argparse
 import http.server
 import socketserver
@@ -30,17 +32,25 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 import requests
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+# Suppress all library runtime warnings (e.g. urllib3 LibreSSL warnings)
+warnings.filterwarnings("ignore")
+os.environ["PYTHONWARNINGS"] = "ignore"
+
+# Configure logging strictly to stderr to protect stdout for stdio MCP
+logging.basicConfig(
+    stream=sys.stderr,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] [LinkedInSuite] %(message)s"
+)
 logger = logging.getLogger("LinkedInSuite")
 
-# Rich Terminal UI with fallback
+# Rich Terminal UI with stderr routing for clean MCP transport
 try:
     from rich.console import Console, Group
     from rich.panel import Panel
     from rich.table import Table
     from rich.prompt import Confirm
-    console = Console()
+    console = Console(stderr=True)
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
@@ -75,8 +85,8 @@ class LinkedInTokenVault:
             "client_id": os.getenv("LINKEDIN_CLIENT_ID", ""),
             "client_secret": os.getenv("LINKEDIN_CLIENT_SECRET", ""),
             "author_urn": os.getenv("LINKEDIN_AUTHOR_URN", ""),
-            "expires_at": 0,
-            "refresh_expires_at": 0,
+            "expires_at": int(os.getenv("LINKEDIN_EXPIRES_AT", "0") or 0),
+            "refresh_expires_at": int(os.getenv("LINKEDIN_REFRESH_EXPIRES_AT", "0") or 0),
         }
 
         if cls.TOKEN_FILE.exists():
@@ -108,7 +118,7 @@ class LinkedInTokenVault:
 
 class LinkedInClient:
     """
-    Robust, compliant REST client for official LinkedIn APIs.
+    Robust, compliant REST client for official LinkedIn APIs with self-healing authentication.
     """
 
     BASE_REST_URL = "https://api.linkedin.com/rest"
@@ -131,6 +141,8 @@ class LinkedInClient:
         self.client_id = client_id or vault.get("client_id", "")
         self.client_secret = client_secret or vault.get("client_secret", "")
         self.author_urn = vault.get("author_urn", "")
+        self.expires_at = int(vault.get("expires_at", 0) or 0)
+        self.refresh_expires_at = int(vault.get("refresh_expires_at", 0) or 0)
         self.api_version = api_version or os.getenv("LINKEDIN_API_VERSION", self.DEFAULT_API_VERSION)
         self.session = session or requests.Session()
 
@@ -147,6 +159,60 @@ class LinkedInClient:
             self.client_secret = vault["client_secret"]
         if vault.get("author_urn"):
             self.author_urn = vault["author_urn"]
+        if vault.get("expires_at"):
+            self.expires_at = int(vault["expires_at"] or 0)
+        if vault.get("refresh_expires_at"):
+            self.refresh_expires_at = int(vault["refresh_expires_at"] or 0)
+
+    def ensure_authenticated(self, auto_oauth: bool = True) -> bool:
+        """
+        Pre-flight Token & Credential Check with Self-Healing Auth:
+        1. Checks if access_token is present and unexpired.
+        2. If access_token is missing or expired, performs silent refresh via refresh_token.
+        3. If refresh fails or no tokens exist, automatically triggers OAuth 2.0 flow if auto_oauth=True.
+        """
+        now = int(time.time())
+
+        # Check if current client has active, unexpired token
+        has_active_token = bool(self.access_token)
+        if self.expires_at > 0 and now >= (self.expires_at - 60):
+            has_active_token = False
+
+        if has_active_token:
+            return True
+
+        # Attempt silent refresh if refresh_token and client credentials are present
+        if self.refresh_token and self.client_id and self.client_secret:
+            logger.info("Access token expired or missing. Executing pre-flight silent token refresh...")
+            try:
+                self.refresh_access_token()
+                if self.access_token:
+                    return True
+            except Exception as e:
+                logger.warning(f"Pre-flight token refresh failed: {e}")
+
+        # If silent refresh fails or no tokens exist, trigger automatic OAuth flow
+        if auto_oauth:
+            if not self.client_id or not self.client_secret:
+                raise LinkedInAPIError(
+                    status_code=401,
+                    message=(
+                        "LinkedIn credentials uninitialized. Please set LINKEDIN_CLIENT_ID and "
+                        "LINKEDIN_CLIENT_SECRET in environment or ~/.config/linkedin-agent/tokens.json."
+                    )
+                )
+
+            logger.info("Triggering automatic OAuth 2.0 1-click browser authorization...")
+            execute_oauth_flow(self.client_id, self.client_secret)
+            self.reload_tokens()
+
+            if self.access_token:
+                return True
+
+        raise LinkedInAPIError(
+            status_code=401,
+            message="No valid LinkedIn credentials available. Please authenticate via OAuth."
+        )
 
     def _get_headers(self, method: str = "GET", extra_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         """Constructs mandatory headers with versioning and idempotency keys."""
@@ -222,8 +288,10 @@ class LinkedInClient:
     # Profile & Identity (/v2/userinfo)
     # --------------------------------------------------------------------------
 
-    def get_profile(self) -> Dict[str, Any]:
+    def get_profile(self, auto_auth: bool = True) -> Dict[str, Any]:
         """Fetches the authenticated member profile and person URN."""
+        if auto_auth:
+            self.ensure_authenticated(auto_oauth=True)
         url = f"{self.BASE_OIDC_URL}/userinfo"
         resp = self._request("GET", url)
         data = resp.json()
@@ -244,15 +312,18 @@ class LinkedInClient:
         article_url: Optional[str] = None,
         article_title: Optional[str] = None,
         media_urn: Optional[str] = None,
+        auto_auth: bool = True,
     ) -> Dict[str, Any]:
         """
         Publishes a post using the modern `/rest/posts` API.
         """
+        if auto_auth:
+            self.ensure_authenticated(auto_oauth=True)
+
         target_author = author_urn or self.author_urn
         if not target_author:
-            # Attempt to resolve from userinfo
             try:
-                prof = self.get_profile()
+                prof = self.get_profile(auto_auth=False)
                 target_author = prof.get("urn", "")
             except Exception:
                 pass
@@ -306,8 +377,10 @@ class LinkedInClient:
     # Two-Step Media Upload (/rest/images)
     # --------------------------------------------------------------------------
 
-    def initialize_image_upload(self, owner_urn: str) -> Dict[str, str]:
+    def initialize_image_upload(self, owner_urn: str, auto_auth: bool = True) -> Dict[str, str]:
         """Step 1: Initializes image asset creation to obtain upload URL and URN."""
+        if auto_auth:
+            self.ensure_authenticated(auto_oauth=True)
         url = f"{self.BASE_REST_URL}/images?action=initializeUpload"
         payload = {
             "initializeUploadRequest": {
@@ -324,10 +397,9 @@ class LinkedInClient:
     def upload_image_binary(self, upload_url: str, image_bytes: bytes, mime_type: str = "image/jpeg") -> bool:
         """
         Step 2: PUTs raw binary image data to uploadUrl.
-        Strips Authorization headers if the target is a pre-signed S3/blob URL to prevent 400 signature errors.
+        Strips Authorization headers if target is a pre-signed S3/blob URL.
         """
         headers = {"Content-Type": mime_type}
-        # Only attach Authorization if URL is directly on api.linkedin.com (not an external S3/CDN pre-signed URL)
         if "api.linkedin.com" in upload_url:
             headers["Authorization"] = f"Bearer {self.access_token}"
 
@@ -336,13 +408,16 @@ class LinkedInClient:
             raise LinkedInAPIError(resp.status_code, f"Failed uploading image bytes: {resp.text}")
         return True
 
-    def upload_image_file(self, file_path: str, owner_urn: str) -> str:
+    def upload_image_file(self, file_path: str, owner_urn: str, auto_auth: bool = True) -> str:
         """Helper to upload local image file and return LinkedIn media URN."""
+        if auto_auth:
+            self.ensure_authenticated(auto_oauth=True)
+
         p = Path(file_path)
         if not p.exists():
             raise FileNotFoundError(f"Media file not found: {file_path}")
 
-        init_data = self.initialize_image_upload(owner_urn)
+        init_data = self.initialize_image_upload(owner_urn, auto_auth=False)
         mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
         
         with open(p, "rb") as f:
@@ -354,22 +429,28 @@ class LinkedInClient:
     # Activity & Community Management (/rest/socialActions)
     # --------------------------------------------------------------------------
 
-    def list_posts(self, author_urn: str, count: int = 10) -> List[Dict[str, Any]]:
+    def list_posts(self, author_urn: str, count: int = 10, auto_auth: bool = True) -> List[Dict[str, Any]]:
         """Retrieves recent posts authored by a member or company page."""
+        if auto_auth:
+            self.ensure_authenticated(auto_oauth=True)
         url = f"{self.BASE_REST_URL}/posts"
         params = {"author": author_urn, "q": "author", "count": count}
         resp = self._request("GET", url, params=params)
         return resp.json().get("elements", [])
 
-    def get_comments(self, target_urn: str, count: int = 20) -> List[Dict[str, Any]]:
+    def get_comments(self, target_urn: str, count: int = 20, auto_auth: bool = True) -> List[Dict[str, Any]]:
         """Fetches comment threads on a specific post or content item."""
+        if auto_auth:
+            self.ensure_authenticated(auto_oauth=True)
         url = f"{self.BASE_REST_URL}/socialActions/{target_urn}/comments"
         params = {"count": count}
         resp = self._request("GET", url, params=params)
         return resp.json().get("elements", [])
 
-    def reply_comment(self, target_urn: str, actor_urn: str, text: str) -> Dict[str, Any]:
+    def reply_comment(self, target_urn: str, actor_urn: str, text: str, auto_auth: bool = True) -> Dict[str, Any]:
         """Posts an official reply to a comment thread."""
+        if auto_auth:
+            self.ensure_authenticated(auto_oauth=True)
         url = f"{self.BASE_REST_URL}/socialActions/{target_urn}/comments"
         payload = {"actor": actor_urn, "message": {"text": text}}
         resp = self._request("POST", url, json_data=payload)
@@ -403,14 +484,19 @@ class LinkedInClient:
         new_token = token_data.get("access_token", "")
         self.access_token = new_token
         
+        expires_at = int(time.time()) + token_data.get("expires_in", 5184000)
+        self.expires_at = expires_at
+
         save_payload = {
             "access_token": new_token,
-            "expires_at": int(time.time()) + token_data.get("expires_in", 5184000),
+            "expires_at": expires_at,
         }
         if token_data.get("refresh_token"):
             self.refresh_token = token_data["refresh_token"]
+            refresh_expires_at = int(time.time()) + token_data.get("refresh_token_expires_in", 31536000)
+            self.refresh_expires_at = refresh_expires_at
             save_payload["refresh_token"] = token_data["refresh_token"]
-            save_payload["refresh_expires_at"] = int(time.time()) + token_data.get("refresh_token_expires_in", 31536000)
+            save_payload["refresh_expires_at"] = refresh_expires_at
 
         LinkedInTokenVault.save_tokens(save_payload)
         logger.info("Access token renewed and vault updated.")
@@ -442,7 +528,7 @@ class OAuthCallbackHandler(http.server.SimpleHTTPRequestHandler):
                 <head><title>Authentication Complete</title></head>
                 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 60px;">
                     <h2 style="color: #0a66c2;">LinkedIn Authentication Successful!</h2>
-                    <p style="color: #555;">Authorization code captured. You may now close this browser window and return to your terminal.</p>
+                    <p style="color: #555;">Authorization code captured. You may now close this browser window and return to your terminal or agent.</p>
                 </body>
                 </html>
             """)
@@ -492,8 +578,8 @@ def execute_oauth_flow(client_id: str, client_secret: str, preferred_port: int =
             border_style="green"
         ))
     else:
-        print(f"Starting OAuth listener on {redirect_uri}...")
-        print(f"Authorize at: {auth_url}")
+        logger.info(f"Starting OAuth listener on {redirect_uri}...")
+        logger.info(f"Authorize at: {auth_url}")
 
     webbrowser.open(auth_url)
 
@@ -502,17 +588,14 @@ def execute_oauth_flow(client_id: str, client_secret: str, preferred_port: int =
             httpd.handle_request()
     except OSError as e:
         logger.error(f"Failed binding port {port}: {e}")
-        sys.exit(1)
+        raise LinkedInAPIError(status_code=500, message=f"Failed binding OAuth listener port: {e}")
 
     code = OAuthCallbackHandler.auth_code
     if not code:
-        if HAS_RICH and console:
-            console.print("[bold red]Failed to capture authorization code.[/bold red]")
-        else:
-            print("Failed to capture authorization code.")
-        sys.exit(1)
+        logger.error("Failed to capture authorization code.")
+        raise LinkedInAPIError(status_code=400, message="OAuth authorization code not received.")
 
-    logger.info("Exchanging code for tokens...")
+    logger.info("Exchanging authorization code for access & refresh tokens...")
     resp = requests.post(
         "https://www.linkedin.com/oauth/v2/accessToken",
         data={
@@ -534,7 +617,7 @@ def execute_oauth_flow(client_id: str, client_secret: str, preferred_port: int =
         temp_client = LinkedInClient(access_token=token)
         author_urn = ""
         try:
-            prof = temp_client.get_profile()
+            prof = temp_client.get_profile(auto_auth=False)
             author_urn = prof.get("urn", "")
         except Exception:
             pass
@@ -560,9 +643,10 @@ def execute_oauth_flow(client_id: str, client_secret: str, preferred_port: int =
                 border_style="green"
             ))
         else:
-            print(f"Authenticated successfully! Author URN: {author_urn}")
+            logger.info(f"Authenticated successfully! Author URN: {author_urn}")
     else:
         logger.error(f"Token exchange failed: {resp.text}")
+        raise LinkedInAPIError(status_code=resp.status_code, message=f"OAuth token exchange failed: {resp.text}")
 
 
 # ==============================================================================
@@ -617,19 +701,19 @@ def render_post_preview(
             padding=(1, 2)
         ))
     else:
-        print("\n=== LinkedIn Post Dry-Run Preview ===")
-        print(f"Author: {author_urn} | Visibility: {visibility}")
-        print(f"Length: {char_count}/{max_chars} chars")
+        logger.info("=== LinkedIn Post Dry-Run Preview ===")
+        logger.info(f"Author: {author_urn} | Visibility: {visibility}")
+        logger.info(f"Length: {char_count}/{max_chars} chars")
         if hashtags:
-            print(f"Hashtags: {', '.join(hashtags)}")
-        print("\nContent:\n" + text)
-        print("=====================================\n")
+            logger.info(f"Hashtags: {', '.join(hashtags)}")
+        logger.info("Content:\n" + text)
+        logger.info("=====================================")
 
     if char_count > max_chars:
         if HAS_RICH and console:
             console.print("[bold red]Publish blocked: Character count exceeds 3,000 limit.[/bold red]")
         else:
-            print("Publish blocked: Exceeds 3,000 characters.")
+            logger.error("Publish blocked: Exceeds 3,000 characters.")
         return False
 
     return True
@@ -653,10 +737,17 @@ def cmd_publish(args, client: LinkedInClient):
         logger.error("Provide post commentary via --text or --file.")
         sys.exit(1)
 
+    # Ensure authenticated
+    try:
+        client.ensure_authenticated(auto_oauth=True)
+    except Exception as e:
+        logger.error(f"Authentication failed: {e}")
+        sys.exit(1)
+
     author_urn = args.author or client.author_urn
     if not author_urn:
         try:
-            prof = client.get_profile()
+            prof = client.get_profile(auto_auth=False)
             author_urn = prof.get("urn", "")
         except Exception:
             pass
@@ -692,7 +783,7 @@ def cmd_publish(args, client: LinkedInClient):
             if HAS_RICH and console:
                 console.print("[dim]Action cancelled by user. No live call made.[/dim]")
             else:
-                print("Action cancelled.")
+                logger.info("Action cancelled.")
             return
 
     # Execute Live Publish
@@ -712,6 +803,7 @@ def cmd_publish(args, client: LinkedInClient):
             visibility=args.visibility,
             article_url=args.link,
             media_urn=media_urn,
+            auto_auth=False,
         )
 
         post_urn = result.get("urn", result.get("id", "Published"))
@@ -723,7 +815,7 @@ def cmd_publish(args, client: LinkedInClient):
                 border_style="green"
             ))
         else:
-            print(f"✔ Post published successfully: {post_urn}")
+            logger.info(f"✔ Post published successfully: {post_urn}")
     except Exception as e:
         logger.error(f"Publication failed: {e}")
         sys.exit(1)
@@ -731,7 +823,7 @@ def cmd_publish(args, client: LinkedInClient):
 
 def cmd_profile(args, client: LinkedInClient):
     try:
-        data = client.get_profile()
+        data = client.get_profile(auto_auth=True)
         if HAS_RICH and console:
             table = Table(title="👤 Authenticated LinkedIn Profile", header_style="bold magenta")
             table.add_column("Property", style="cyan")
@@ -742,14 +834,14 @@ def cmd_profile(args, client: LinkedInClient):
             table.add_row("Picture", (data.get("picture", "N/A")[:50] + "...") if data.get("picture") else "None")
             console.print(table)
         else:
-            print("Profile:", json.dumps(data, indent=2))
+            logger.info("Profile: " + json.dumps(data, indent=2))
     except Exception as e:
         logger.error(f"Failed fetching profile: {e}")
 
 
 def cmd_comments(args, client: LinkedInClient):
     try:
-        comments = client.get_comments(target_urn=args.urn, count=args.count)
+        comments = client.get_comments(target_urn=args.urn, count=args.count, auto_auth=True)
         if HAS_RICH and console:
             table = Table(title=f"💬 Comments on {args.urn}", header_style="bold cyan")
             table.add_column("Actor URN", style="yellow")
@@ -760,7 +852,7 @@ def cmd_comments(args, client: LinkedInClient):
                 table.add_row(actor, txt)
             console.print(table)
         else:
-            print(f"Comments on {args.urn}:", json.dumps(comments, indent=2))
+            logger.info(f"Comments on {args.urn}: " + json.dumps(comments, indent=2))
     except Exception as e:
         logger.error(f"Failed fetching comments: {e}")
 

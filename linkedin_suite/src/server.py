@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-LinkedIn Official API MCP Server.
+LinkedIn Official API FastMCP Server.
 
-Provides a robust, dual-mode Model Context Protocol (MCP) server:
-1. Native FastMCP when the `mcp` package is available.
-2. Zero-dependency JSON-RPC 2.0 stdio protocol engine fallback for universal compatibility.
-
-All logs/warnings are strictly filtered or routed to stderr to ensure 100% clean JSON-RPC transport over stdout.
+Provides a robust Model Context Protocol (MCP) server for AI assistants:
+- Pre-flight token validation & self-healing authentication (silent refresh + auto-OAuth browser login)
+- Zero-dependency JSON-RPC 2.0 stdio engine for universal compatibility
+- All logging and runtime warnings strictly isolated to stderr to ensure 100% clean stdout protocol frames
 """
 
 import sys
@@ -15,11 +14,11 @@ import json
 import warnings
 import logging
 
-# 1. Suppress all urllib3 and Python runtime warnings to prevent stdout/stderr protocol pollution
+# 1. Suppress all library runtime warnings to keep stdio completely clean
 warnings.filterwarnings("ignore")
 os.environ["PYTHONWARNINGS"] = "ignore"
 
-# Configure logging strictly to stderr
+# 2. Configure logging strictly to stderr
 logging.basicConfig(
     stream=sys.stderr,
     level=logging.INFO,
@@ -27,30 +26,50 @@ logging.basicConfig(
 )
 logger = logging.getLogger("LinkedInMCP")
 
-# Ensure repository root / scripts directory is on sys.path
+# Ensure repository root is in sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-from linkedin_suite import LinkedInClient, LinkedInAPIError
+
+try:
+    from scripts.linkedin_suite import LinkedInClient, LinkedInAPIError, execute_oauth_flow
+except ImportError:
+    from linkedin_suite import LinkedInClient, LinkedInAPIError, execute_oauth_flow
 
 # Initialize Client
 client = LinkedInClient()
 
+
+def ensure_client_authenticated() -> None:
+    """Performs pre-flight verification, silent refresh, or auto-OAuth trigger."""
+    client.ensure_authenticated(auto_oauth=True)
+
+
 # ==============================================================================
-# Tool Implementations
+# Tool Implementations with Self-Healing Auth
 # ==============================================================================
 
 def tool_get_profile(arguments: dict = None) -> str:
     """Fetches the authenticated LinkedIn member profile and person URN."""
-    client.reload_tokens()
     try:
-        profile = client.get_profile()
+        ensure_client_authenticated()
+        profile = client.get_profile(auto_auth=False)
         return json.dumps(profile, indent=2)
+    except LinkedInAPIError as e:
+        return json.dumps({
+            "error": "Authentication Error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "action_required": "Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in .env or run `python3 scripts/linkedin_suite.py login`"
+        }, indent=2)
     except Exception as e:
-        return json.dumps({"error": str(e), "tip": "Run `python3 scripts/linkedin_suite.py login` or check .env"})
+        return json.dumps({
+            "error": "Failed fetching profile",
+            "details": str(e)
+        }, indent=2)
 
 
 def tool_create_post(arguments: dict = None) -> str:
     """Publishes a post to LinkedIn using the modern /rest/posts endpoint."""
-    client.reload_tokens()
     args = arguments or {}
     text = args.get("text", "")
     author_urn = args.get("author_urn")
@@ -59,27 +78,35 @@ def tool_create_post(arguments: dict = None) -> str:
     media_urn = args.get("media_urn")
 
     if not text:
-        return json.dumps({"error": "Post text commentary is required."})
+        return json.dumps({"error": "Post commentary text is required."})
 
     if len(text) > 3000:
-        return json.dumps({"error": f"Post commentary exceeds LinkedIn 3000 character limit ({len(text)} chars)."})
+        return json.dumps({"error": f"Post commentary exceeds LinkedIn 3,000 character limit ({len(text)} chars)."})
 
     try:
+        ensure_client_authenticated()
         res = client.create_post(
             text=text,
             author_urn=author_urn,
             visibility=visibility,
             article_url=article_url,
             media_urn=media_urn,
+            auto_auth=False,
         )
         return json.dumps({"status": "success", "post": res}, indent=2)
+    except LinkedInAPIError as e:
+        return json.dumps({
+            "error": "Authentication Error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "action_required": "Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in .env or run `python3 scripts/linkedin_suite.py login`"
+        }, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
 def tool_upload_media(arguments: dict = None) -> str:
     """Uploads a local image file via 2-step media upload and returns media URN."""
-    client.reload_tokens()
     args = arguments or {}
     file_path = args.get("file_path", "")
     owner_urn = args.get("owner_urn", "")
@@ -88,15 +115,22 @@ def tool_upload_media(arguments: dict = None) -> str:
         return json.dumps({"error": f"Media file not found: {file_path}"})
 
     try:
-        media_urn = client.upload_image_file(file_path, owner_urn=owner_urn)
+        ensure_client_authenticated()
+        media_urn = client.upload_image_file(file_path, owner_urn=owner_urn, auto_auth=False)
         return json.dumps({"status": "success", "media_urn": media_urn}, indent=2)
+    except LinkedInAPIError as e:
+        return json.dumps({
+            "error": "Authentication Error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "action_required": "Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in .env or run `python3 scripts/linkedin_suite.py login`"
+        }, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
 def tool_get_comments(arguments: dict = None) -> str:
     """Fetches comments on a specific post URN."""
-    client.reload_tokens()
     args = arguments or {}
     target_urn = args.get("target_urn", "")
     count = args.get("count", 20)
@@ -105,15 +139,22 @@ def tool_get_comments(arguments: dict = None) -> str:
         return json.dumps({"error": "target_urn is required (e.g. urn:li:share:12345)"})
 
     try:
-        comments = client.get_comments(target_urn=target_urn, count=count)
+        ensure_client_authenticated()
+        comments = client.get_comments(target_urn=target_urn, count=count, auto_auth=False)
         return json.dumps({"status": "success", "count": len(comments), "comments": comments}, indent=2)
+    except LinkedInAPIError as e:
+        return json.dumps({
+            "error": "Authentication Error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "action_required": "Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in .env or run `python3 scripts/linkedin_suite.py login`"
+        }, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
 def tool_reply_comment(arguments: dict = None) -> str:
     """Posts a reply to a comment thread."""
-    client.reload_tokens()
     args = arguments or {}
     target_urn = args.get("target_urn", "")
     actor_urn = args.get("actor_urn", "")
@@ -123,22 +164,37 @@ def tool_reply_comment(arguments: dict = None) -> str:
         return json.dumps({"error": "target_urn and text are required."})
 
     try:
-        res = client.reply_comment(target_urn=target_urn, actor_urn=actor_urn, text=text)
+        ensure_client_authenticated()
+        res = client.reply_comment(target_urn=target_urn, actor_urn=actor_urn, text=text, auto_auth=False)
         return json.dumps({"status": "success", "result": res}, indent=2)
+    except LinkedInAPIError as e:
+        return json.dumps({
+            "error": "Authentication Error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "action_required": "Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in .env or run `python3 scripts/linkedin_suite.py login`"
+        }, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
 def tool_list_posts(arguments: dict = None) -> str:
     """Retrieves recent posts authored by a member or organization."""
-    client.reload_tokens()
     args = arguments or {}
     author_urn = args.get("author_urn", "")
     count = args.get("count", 10)
 
     try:
-        posts = client.list_posts(author_urn=author_urn, count=count)
+        ensure_client_authenticated()
+        posts = client.list_posts(author_urn=author_urn, count=count, auto_auth=False)
         return json.dumps({"status": "success", "count": len(posts), "elements": posts}, indent=2)
+    except LinkedInAPIError as e:
+        return json.dumps({
+            "error": "Authentication Error",
+            "message": str(e),
+            "status_code": e.status_code,
+            "action_required": "Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in .env or run `python3 scripts/linkedin_suite.py login`"
+        }, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
@@ -146,7 +202,7 @@ def tool_list_posts(arguments: dict = None) -> str:
 # Tool definitions registry
 TOOLS_REGISTRY = {
     "linkedin_get_profile": {
-        "description": "Fetches authenticated LinkedIn member profile and person URN (urn:li:person:...).",
+        "description": "Fetches authenticated LinkedIn member profile and person URN (urn:li:person:...). Automatically handles authentication.",
         "inputSchema": {
             "type": "object",
             "properties": {},
@@ -155,7 +211,7 @@ TOOLS_REGISTRY = {
         "handler": tool_get_profile
     },
     "linkedin_create_post": {
-        "description": "Publishes a post to LinkedIn using the official /rest/posts endpoint with automatic idempotency.",
+        "description": "Publishes a post to LinkedIn using the official /rest/posts endpoint with automatic idempotency and authentication.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -226,10 +282,7 @@ TOOLS_REGISTRY = {
 # ==============================================================================
 
 def run_stdio_jsonrpc_server():
-    """
-    Standard JSON-RPC 2.0 stdio server conforming to Model Context Protocol specs.
-    Handles initialize, tools/list, tools/call, and ping requests.
-    """
+    """Standard JSON-RPC 2.0 stdio server conforming to Model Context Protocol specs."""
     logger.info("LinkedIn Official MCP Stdio Server running...")
 
     for line in sys.stdin:
@@ -366,10 +419,6 @@ def run_stdio_jsonrpc_server():
             sys.stdout.flush()
 
 
-# ==============================================================================
-# Helper wrappers for direct module execution and FastMCP exports
-# ==============================================================================
-
 def linkedin_get_profile() -> str:
     return tool_get_profile()
 
@@ -390,7 +439,6 @@ def linkedin_list_posts(author_urn: str, count: int = 10) -> str:
 
 
 def main():
-    """Main process entrypoint."""
     run_stdio_jsonrpc_server()
 
 

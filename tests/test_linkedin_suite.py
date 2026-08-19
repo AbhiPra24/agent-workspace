@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch, mock_open
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 # Ensure repository root is on sys.path
@@ -248,6 +249,76 @@ class TestLinkedInSuite(unittest.TestCase):
             self.client.reload_tokens()
             self.assertEqual(self.client.access_token, "dynamically_loaded_token")
             self.assertEqual(self.client.author_urn, "urn:li:person:dynamic_urn")
+
+    def test_ensure_authenticated_active_token(self):
+        """Verifies ensure_authenticated returns True if access token is active and unexpired."""
+        self.client.access_token = "active_token_123"
+        self.client.expires_at = int(time.time()) + 3600
+        self.assertTrue(self.client.ensure_authenticated(auto_oauth=False))
+
+    def test_ensure_authenticated_expired_triggers_refresh(self):
+        """Verifies ensure_authenticated triggers refresh when access token is expired."""
+        self.client.access_token = "expired_token_123"
+        self.client.expires_at = int(time.time()) - 100  # expired
+        self.client.refresh_token = "valid_refresh_token"
+        self.client.client_id = "test_client_id"
+        self.client.client_secret = "test_client_secret"
+
+        with patch.object(self.client, "refresh_access_token") as mock_refresh:
+            def side_effect():
+                self.client.access_token = "new_refreshed_token"
+                self.client.expires_at = int(time.time()) + 3600
+                return {"access_token": "new_refreshed_token"}
+            mock_refresh.side_effect = side_effect
+
+            res = self.client.ensure_authenticated(auto_oauth=False)
+            self.assertTrue(res)
+            mock_refresh.assert_called_once()
+            self.assertEqual(self.client.access_token, "new_refreshed_token")
+
+    def test_ensure_authenticated_empty_triggers_oauth(self):
+        """Verifies ensure_authenticated invokes execute_oauth_flow when vault is empty."""
+        self.client.access_token = ""
+        self.client.refresh_token = ""
+        self.client.client_id = "test_client_id"
+        self.client.client_secret = "test_client_secret"
+
+        with patch("scripts.linkedin_suite.execute_oauth_flow") as mock_oauth, \
+             patch.object(LinkedInTokenVault, "load_tokens") as mock_load:
+            mock_load.return_value = {
+                "access_token": "oauth_generated_token",
+                "refresh_token": "oauth_refresh_token",
+                "client_id": "test_client_id",
+                "client_secret": "test_client_secret",
+                "expires_at": int(time.time()) + 3600
+            }
+            res = self.client.ensure_authenticated(auto_oauth=True)
+            self.assertTrue(res)
+            mock_oauth.assert_called_once_with("test_client_id", "test_client_secret")
+
+    def test_ensure_authenticated_missing_creds_raises_error(self):
+        """Verifies ensure_authenticated raises LinkedInAPIError when credentials are not configured."""
+        self.client.access_token = ""
+        self.client.refresh_token = ""
+        self.client.client_id = ""
+        self.client.client_secret = ""
+
+        with patch.object(LinkedInTokenVault, "load_tokens") as mock_load:
+            mock_load.return_value = {}
+            with self.assertRaises(LinkedInAPIError) as cm:
+                self.client.ensure_authenticated(auto_oauth=True)
+            self.assertEqual(cm.exception.status_code, 401)
+            self.assertIn("LINKEDIN_CLIENT_ID", cm.exception.message)
+
+    def test_mcp_tool_missing_creds_returns_actionable_error(self):
+        """Verifies FastMCP tools return clear action_required guidance when credentials are missing."""
+        with patch.object(mcp_server.client, "ensure_authenticated") as mock_ensure:
+            mock_ensure.side_effect = LinkedInAPIError(status_code=401, message="Credentials uninitialized")
+            res = mcp_server.linkedin_get_profile()
+            data = json.loads(res)
+            self.assertEqual(data["error"], "Authentication Error")
+            self.assertEqual(data["status_code"], 401)
+            self.assertIn("action_required", data)
 
 
 if __name__ == "__main__":
