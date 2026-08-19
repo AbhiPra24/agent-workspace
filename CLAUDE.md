@@ -645,3 +645,51 @@ Conducts exhaustive, evidence-based research across official documentation, tech
 - Explicitly note version compatibility and release dates.
 - Format results with clear headings, bullet points, and markdown tables.
 
+### linkedin-official-publisher
+**Description**: Drafts, formats, and publishes high-impact posts to LinkedIn using the official REST API (/rest/posts) with mandatory versioning headers, automatic UUID idempotency keys, and interactive Rich terminal previews with dry-run confirmation before live transmission. Trigger with `/linkedin-publish [topic_or_draft] [--media path] [--link url]`.
+
+# LinkedIn Official Publisher Skill
+
+Executes 100% compliant post publishing via LinkedIn's official `/rest/posts` API with built-in character limit validation, visual previews, and idempotency protection.
+
+## Core Architectural Guardrails
+1. **Modern Endpoints Exclusively**: Targets `POST /rest/posts` (never deprecated `/v2/ugcPosts` or `/v2/shares`).
+2. **Mandatory Versioning Headers**: Globally injects `LinkedIn-Version: 202401` and `X-Restli-Protocol-Version: 2.0.0`.
+3. **Idempotency Protection**: Injects a cryptographically unique UUID into `X-RestLi-Idempotency-Key` on every POST to prevent accidental duplicates.
+4. **2-Step Media Upload**: Executes `initializeUpload` -> binary `PUT` for images before attaching to posts.
+5. **Dry-Run Default**: Prints a Rich console diff showing character counts, hook structure, and parsed hashtags, requiring `[y/N]` confirmation before live dispatch.
+
+## Execution
+```bash
+# Preview post in terminal before publishing
+python3 scripts/linkedin_suite.py publish --text "Exploring new AI agent architectures with official LinkedIn APIs #ai #python"
+
+# Publish with attached image
+python3 scripts/linkedin_suite.py publish --text "System Blueprint" --media architecture.png
+
+# Check profile & member URN
+python3 scripts/linkedin_suite.py profile
+
+# Rotate 365-day token
+python3 scripts/linkedin_suite.py refresh
+```
+
+### linkedin-company-manager
+**Description**: Monitors LinkedIn Organization Pages, inspects recent company updates, retrieves inbound comment threads, and posts official company replies using LinkedIn's Community Management API (/rest/socialActions). Trigger with `/linkedin-company [comments|posts|reply] [--urn target_urn]`.
+
+# LinkedIn Company Manager Skill
+
+Manages LinkedIn Organization/Company pages and community discussions using official LinkedIn Community Management endpoints (`/rest/socialActions` and `/rest/posts`).
+
+## Capabilities
+1. **Activity Monitoring**: Lists recent posts authored by an organization page.
+2. **Comment Moderation**: Pulls live comment threads on company posts.
+3. **Official Replies**: Crafts and submits official responses as the company or admin actor.
+
+## Execution
+```bash
+# Fetch comments on post URN
+python3 scripts/linkedin_suite.py comments --urn urn:li:share:123456789 --count 20
+```
+
+
