@@ -729,13 +729,112 @@ class ATSAuditor:
 
 
 # ==============================================================================
-# LaTeX Generation Engine
+# Role-Specific Archetype Templates & Keyword Libraries
+# ==============================================================================
+
+ROLE_ARCHETYPES = {
+    "pm": {
+        "title": "Technical Product Manager (TPM) / Platform PM",
+        "summary_focus": "architecting internal developer platforms, IoT ecosystems, and cross-functional release governance",
+        "skill_categories": {
+            "Product & Program Management": [
+                "Product Roadmapping", "PRDs & User Stories", "Developer Experience (DevEx)",
+                "Cross-Functional Alignment", "Release Governance", "KPI/Metric Tracking (MTTR, Flakiness, Lead Time)", "Agile/Scrum"
+            ],
+            "Platforms & Systems": [
+                "Internal Developer Platforms", "Microservices", "REST APIs", "IoT & Hardware-Software Ecosystems",
+                "OCPP 1.6/2.0 Protocols", "CI/CD Pipelines", "Docker", "Linux/Unix"
+            ],
+            "Tech Stack & Tooling": [
+                "Python", "FastAPI", "Streamlit", "Git", "Jira", "Confluence", "Jenkins", "Postman", "Wireshark", "Burp Suite", "Model Context Protocol (MCP)"
+            ]
+        }
+    },
+    "ai": {
+        "title": "Applied AI / AI Evaluation & Reliability Engineer",
+        "summary_focus": "designing scalable quality systems, data-validation pipelines, and AI/LLM evaluation frameworks",
+        "skill_categories": {
+            "Quality & AI Evaluation": [
+                "LLM-based Evaluation", "Prompt Engineering", "Stratified Sampling", "Automation Bias Prevention",
+                "Golden Labeling", "Human-in-the-loop (HITL) Validation", "Hallucination Scoring"
+            ],
+            "Frameworks & Languages": [
+                "Python", "Java", "Pytest", "Playwright", "FastAPI", "Streamlit"
+            ],
+            "DevOps & Infrastructure": [
+                "Unix", "Docker", "Jenkins", "Git", "CI/CD Pipelines", "Linux CLI", "Model Context Protocol (MCP)"
+            ],
+            "Databases & Security": [
+                "RDBMS", "Network Monitoring", "Wireshark", "Burp Suite", "API Security Validation"
+            ]
+        }
+    },
+    "sdet": {
+        "title": "Lead SDET / Senior QA Automation Architect",
+        "summary_focus": "architecting test automation frameworks, CI/CD pipelines, and shared developer utilities for complex hardware-software ecosystems",
+        "skill_categories": {
+            "Frameworks & Programming": [
+                "Python", "Java", "Pytest", "Playwright", "Selenium", "FastAPI", "Streamlit"
+            ],
+            "DevOps & Infrastructure": [
+                "Unix", "Shell Scripting", "Linux", "Jenkins", "Docker", "CI/CD Pipelines", "Scalable Framework Architecture"
+            ],
+            "Databases & Security": [
+                "RDBMS (SQL/PostgreSQL)", "Wireshark", "Burp Suite", "Network Monitoring", "DevSecOps"
+            ],
+            "Protocols & APIs": [
+                "REST API Testing", "Postman", "Swagger", "OCPP 1.6/2.0.1 (Hardware Integration)"
+            ]
+        }
+    },
+    "swe": {
+        "title": "Senior Backend / Platform Software Engineer",
+        "summary_focus": "building distributed microservices, internal developer tools, and high-throughput backend APIs",
+        "skill_categories": {
+            "Languages & Frameworks": [
+                "Python", "FastAPI", "Java", "Pytest", "Streamlit", "SQL"
+            ],
+            "Infrastructure & Cloud": [
+                "Docker", "Jenkins", "CI/CD", "Linux CLI", "Unix", "Git", "Model Context Protocol (MCP)"
+            ],
+            "API & System Architecture": [
+                "RESTful APIs", "Microservices", "PostgreSQL", "Network Telemetry", "API Security"
+            ]
+        }
+    }
+}
+
+
+# ==============================================================================
+# LaTeX Generation Engine (with Auto 1-Page Vertical Density Calibration)
 # ==============================================================================
 
 class LaTeXResumeGenerator:
-    """Generates crystal-clear, ATS-compliant LaTeX resumes."""
+    """Generates crystal-clear, ATS-compliant LaTeX resumes with 1-page vertical density guarantees."""
 
-    HEADER_TEMPLATE = r"""\documentclass[a4paper,10pt]{article}
+    HEADER_TEMPLATE_1PAGE = r"""\documentclass[a4paper,9.5pt]{article}
+\usepackage[margin=0.42in, top=0.38in, bottom=0.38in]{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+% Suppress page numbering for clean 1-page resume
+\pagestyle{empty}
+
+% Font Configuration: Clean, modern, highly legible Sans-Serif
+\renewcommand{\familydefault}{\sfdefault}
+
+% Section formatting - tight and crisp
+\titleformat{\section}{\normalsize\bfseries\uppercase}{}{0em}{}[\titlerule]
+\titlespacing*{\section}{0pt}{0.7ex plus 0.2ex minus .1ex}{0.4ex plus .1ex}
+
+% Ultra-tight itemized list spacing
+\setlist[itemize]{noitemsep, topsep=1pt, leftmargin=1.2em, parsep=0pt, partopsep=0pt}
+
+\begin{document}
+"""
+
+    HEADER_TEMPLATE_STANDARD = r"""\documentclass[a4paper,10pt]{article}
 \usepackage[margin=0.5in]{geometry}
 \usepackage{titlesec}
 \usepackage{enumitem}
@@ -758,8 +857,9 @@ class LaTeXResumeGenerator:
 \end{document}
 """
 
+
     @classmethod
-    def generate_latex(cls, data: Dict[str, Any]) -> str:
+    def generate_latex(cls, data: Dict[str, Any], fit_one_page: bool = True) -> str:
         contact = data.get("contact", {})
         name = escape_latex(contact.get("name", "Candidate Name"))
         email = contact.get("email", "")
@@ -788,16 +888,20 @@ class LaTeXResumeGenerator:
 
         contact_line = " \\,|\\, \n    ".join(contact_items)
 
-        doc = [cls.HEADER_TEMPLATE]
+        header_tmpl = cls.HEADER_TEMPLATE_1PAGE if fit_one_page else cls.HEADER_TEMPLATE_STANDARD
+        doc = [header_tmpl]
         
+        name_size = r"\LARGE" if fit_one_page else r"\Huge"
         doc.append(f"""%----------------------------
 % Name and Contact
 %----------------------------
 \\begin{{center}}
-    {{\\Huge \\textbf{{{name}}}}}\\\\[4pt]
+    {{{name_size} \\textbf{{{name}}}}}\\\\[2pt]
     {contact_line}
 \\end{{center}}
+\\vspace{{-4pt}}
 """)
+
 
         summary_points = data.get("summary", [])
         if summary_points:

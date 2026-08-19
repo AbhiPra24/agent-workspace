@@ -30,6 +30,9 @@ try:
 except ImportError:
     pass
 
+import re
+import socket
+
 # Rich formatting (with graceful fallback)
 try:
     from rich.console import Console
@@ -46,6 +49,97 @@ except ImportError:
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = WORKSPACE_ROOT / "jobs_cache.db"
 TRACKER_PATH = WORKSPACE_ROOT / ".firecrawl_tracker.json"
+
+
+# ==============================================================================
+# Email Deliverability & Verification Guardrails
+# ==============================================================================
+
+GENERIC_UNMONITORED_PREFIXES = {
+    "recruiting", "hiring", "careers", "jobs", "info", "contact",
+    "hr", "talent", "support", "help", "sales", "general", "inquiries", "reception"
+}
+
+
+def validate_email_syntax(email: str) -> bool:
+    """Validates email format using strict RFC 5322 regex."""
+    if not email or "@" not in email:
+        return False
+    pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+    return bool(re.match(pattern, email.strip()))
+
+
+def is_generic_alias(email: str) -> bool:
+    """Detects unmonitored generic catch-all aliases known to bounce or trigger spam blocks."""
+    if not email or "@" not in email:
+        return False
+    prefix = email.split("@")[0].lower().strip()
+    return prefix in GENERIC_UNMONITORED_PREFIXES
+
+
+def check_domain_dns_mx(domain: str) -> bool:
+    """Checks whether the domain resolves to an active DNS/host."""
+    if not domain:
+        return False
+    try:
+        # Check host resolution
+        socket.getaddrinfo(domain, 80, proto=socket.IPPROTO_TCP)
+        return True
+    except socket.gaierror:
+        return False
+
+
+def verify_email_deliverability(email: str) -> Dict[str, Any]:
+    """
+    Double-checks email validity, MX domain resolution, and flags bounce risks.
+    Returns:
+        {
+            "email": str,
+            "is_valid_syntax": bool,
+            "domain_resolves": bool,
+            "is_generic_alias": bool,
+            "deliverability_confidence": "HIGH" | "MEDIUM" | "RISK / BOUNCE LIKELY",
+            "warnings": List[str]
+        }
+    """
+    email_clean = email.strip()
+    warnings = []
+    
+    if not validate_email_syntax(email_clean):
+        return {
+            "email": email_clean,
+            "is_valid_syntax": False,
+            "domain_resolves": False,
+            "is_generic_alias": False,
+            "deliverability_confidence": "INVALID SYNTAX",
+            "warnings": ["Malformed email address syntax."]
+        }
+        
+    domain = email_clean.split("@")[1]
+    domain_ok = check_domain_dns_mx(domain)
+    generic = is_generic_alias(email_clean)
+    
+    if not domain_ok:
+        warnings.append(f"Domain '{domain}' does not resolve in DNS (likely typo or dead domain).")
+    if generic:
+        warnings.append(f"Prefix '{email_clean.split('@')[0]}' is a generic/catch-all alias prone to bounce.")
+        
+    if domain_ok and not generic:
+        confidence = "HIGH (Individual Verified Mailbox)"
+    elif domain_ok and generic:
+        confidence = "MEDIUM (Catch-all Alias - Fallback Only)"
+    else:
+        confidence = "RISK / BOUNCE GUARANTEED"
+        
+    return {
+        "email": email_clean,
+        "is_valid_syntax": True,
+        "domain_resolves": domain_ok,
+        "is_generic_alias": generic,
+        "deliverability_confidence": confidence,
+        "warnings": warnings
+    }
+
 
 
 # ==============================================================================

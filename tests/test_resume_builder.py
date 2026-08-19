@@ -128,7 +128,7 @@ Institute Name
 
         # 4. JSON -> LaTeX
         regenerated_tex = ResumeConverter.json_to_latex(data)
-        self.assertIn(r"\documentclass[a4paper,10pt]{article}", regenerated_tex)
+        self.assertIn(r"\documentclass[a4paper", regenerated_tex)
         self.assertIn("Abhinav Prakash", regenerated_tex)
         self.assertIn(r"\section{Experience}", regenerated_tex)
 

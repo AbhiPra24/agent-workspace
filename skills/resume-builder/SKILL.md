@@ -2,41 +2,45 @@
 name: resume-builder
 description: >-
   Ingests candidate background info from any source (.pdf, .docx, .txt, .md, .tex, or raw notes),
-  applies deep ATS heuristics & Google XYZ metric quantification, generates crystal-clear
-  modern LaTeX resumes, and provides bidirectional conversion to/from LaTeX (Markdown, Text, JSON, PDF).
+  applies deep ATS heuristics & Google XYZ metric quantification, tailors content to role archetypes
+  (PM / TPM, Applied AI, Lead SDET, Backend SWE), guarantees strict 1-page vertical density, and provides
+  native TeX compilation (Tectonic / Overleaf parity) with bidirectional format conversions (Markdown, Text, JSON, PDF).
   Trigger with `/resume-build [input_path]` or `/resume [input_path]`.
 parameters:
   input:
     type: string
     description: Path to input resume document (.pdf, .docx, .txt, .md, .tex, .json) or raw notes
     required: true
+  role:
+    type: string
+    description: Role archetype to tailor keywords and impact metrics (pm | ai | sdet | swe | iot)
+    default: sdet
   to:
     type: string
     description: Target conversion format (latex | md | txt | json | pdf)
     default: latex
-  role:
-    type: string
-    description: Target job title or domain to tailor keywords and impact metrics
-    required: false
   compile:
     type: boolean
-    description: Automatically compile the generated .tex to .pdf
-    default: false
+    description: Automatically compile the generated .tex to PDF using native Tectonic engine
+    default: true
 ---
 
-# ATS Resume Architect & Bidirectional LaTeX Converter Skill
+# ATS Resume Architect & Native TeX Engine Skill (Overleaf Parity)
 
-Transforms raw candidate documents or unstructured experience notes into high-impact, ATS-optimized, crystal-clear LaTeX resumes with full bidirectional format conversion.
+Transforms raw candidate documents or unstructured experience notes into high-impact, ATS-optimized (Grade A+ 100/100), crystal-clear LaTeX resumes with strict **1-page vertical density guarantees** and **native local TeX compilation**.
 
 ## Core Capabilities
 1. **Multi-Format Ingestion**: Extracts text from `.pdf`, `.docx`, `.md`, `.txt`, `.tex`, `.json`, or unformatted input notes.
-2. **Bidirectional Format Conversion**:
-   - **TO LaTeX**: Converts `.pdf`, `.docx`, `.md`, `.txt`, or `.json` into production-ready `.tex`.
-   - **FROM LaTeX**: Converts `.tex` resumes into clean GitHub Markdown (`.md`), plain text (`.txt` for forms), structured JSON (`.json`), or compiled `.pdf`.
-3. **ATS Heuristic Audit Engine**: Scores resumes (0–100) across Structure, Metric Quantification, Action Verbs, and Readability.
-4. **Google XYZ Formula Transformer**: Restructures weak, passive bullet points into high-impact accomplishments (*"Accomplished [X] as measured by [Y], by doing [Z]"*).
-5. **Modern LaTeX Generation**: Emits clean, production-grade LaTeX utilizing `titlesec`, `geometry`, `enumitem`, and legible modern sans-serif typography (`\renewcommand{\familydefault}{\sfdefault}`).
-6. **Compilation Bridge**: Automatically builds `.pdf` output when `pdflatex`, `xelatex`, or `tectonic` are present.
+2. **Role Archetype Tailoring**:
+   - **`pm`**: Technical Product Manager / Platform PM (DevEx, PRDs, zero-to-one developer platforms, release governance, SLA/SLO metrics).
+   - **`ai`**: Applied AI / AI Evaluation & Reliability Engineer (MCP servers, Agentic AI, LLM evaluation, golden dataset labeling, precision/recall benchmarking).
+   - **`sdet`**: Lead SDET / Senior QA Automation Architect (Playwright, PyTest, Docker, CI/CD, DevSecOps, OCPP, distributed testing).
+   - **`swe`**: Backend / Platform SWE (FastAPI, Python, microservices, containerization).
+3. **1-Page Vertical Density Guarantee (`fit-page`)**: Calibrates margins (`margin=0.42in`), typography, and `\titlespacing` to ensure exactly 1 page with zero orphan overflow.
+4. **Native Local TeX Compilation**: Compiles `.tex` into pixel-perfect PDF via `tectonic` (full TeX Live microtypography & font kerning parity with Overleaf).
+5. **ATS Heuristic Audit Engine**: Scores resumes (0–100) across Structure, Metric Quantification, Action Verbs, and Readability.
+6. **Google XYZ Formula Transformer**: Restructures weak, passive bullet points into high-impact accomplishments (*"Accomplished [X] as measured by [Y], by doing [Z]"* with >= 70% quantification).
+7. **Lossless Bidirectional Conversions**: Converts between `.tex` <-> `.md` <-> `.txt` <-> `.json` <-> `.pdf`.
 
 ---
 
